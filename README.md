@@ -16,6 +16,14 @@ Importante: Para ejecutar un flujo real hace falta un backend/intérprete que pr
 - Este editor está orientado a diseño de flujos y prototipado.
 - El backend de ejecución (interpretación del JSON y orquestación) es propietario y no está publicado aquí.
 
+## Motivación
+- Hay muy pocas opciones para construir flujos conversacionales que integren LLM/IA de forma estructurada; este editor busca combinar lo mejor de los flujos deterministas por nodos con las capacidades generativas de los LLM.
+- Unificar el diseño de flujos en un formato JSON portable entre canales y proyectos.
+- Permitir que perfiles no técnicos puedan diseñar y validar experiencias sin depender del backend.
+- Acelerar el prototipado y la comunicación entre producto y desarrollo.
+- Separar responsabilidades: un editor abierto para modelar y un runtime propietario para ejecutar.
+- Diseñar prompts, herramientas y variables/slots de forma explícita para guiar al LLM sin perder trazabilidad ni control.
+
 ## Documentación de nodos
 Cada tipo de nodo, sus campos y comportamiento están descritos en:
 
@@ -87,7 +95,23 @@ Notas útiles
 ## Roadmap (breve)
 - Extensiones de validación por nodo.
 - Plantillas de flujos y exportaciones.
-- Integraciones con el backend propietario.
+- Preparación para Agentes, MCP, A2A y conectores LLM.
+
+## Visión y futuras ideas
+- Colaboración y control de versiones de flujos (multiusuario, cambios comentados).
+- Validaciones avanzadas: tipado de variables, linting de rutas, cobertura de caminos.
+- Biblioteca de plantillas/snippets reutilizables por dominio.
+- Plugins/extensiones: renderers personalizados y validadores específicos.
+- Pruebas automáticas del flujo (simulación headless, snapshots de I/O).
+- Integraciones: import/export desde otras herramientas y conectores a distintos backends.
+- Gestión de contenido e i18n (catálogos, traducciones, revisión).
+- Accesibilidad y UX: atajos de teclado, modo compacto, ayudas contextuales.
+- Agentes: orquestación de agentes con herramientas/acciones, memoria y objetivos dentro del grafo de nodos.
+- MCP (Model Context Protocol): actuar como proveedor y/o consumidor para integrar herramientas y contextos estándar.
+- A2A (Agent-to-Agent): coordinación entre agentes, negociación de pasos y transferencia de estado.
+- Conexiones por LLM: function/tool calling, validación de esquemas/JSON, structured outputs y manejo de errores.
+- RAG: conectores a fuentes de conocimiento y evaluaciones de calidad de respuesta.
+- Observabilidad LLM: trazas, contadores de tokens y costes por sesión.
 
 ## Créditos
 © Elbrinner da Silva Fernandes — Autores de BRI-FLOW.
