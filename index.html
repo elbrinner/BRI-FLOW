@@ -1,0 +1,683 @@
+<!DOCTYPE html>
+<html lang="es">
+  <head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width,initial-scale=1" />
+  <title>Bri Flow — Editor Visual</title>
+  <link rel="stylesheet" href="css/style.css">
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body>
+  <header class="px-4">
+    <div class="flex items-center gap-4 w-full">
+      <div class="flex items-center gap-3">
+        <div class="flex items-center gap-2">
+          <span class="text-2xl font-extrabold text-sky-600">Bri Flow</span>
+          <span id="currentFlowBadge" class="ml-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-sky-50 text-sky-700 border border-sky-200" title="Flujo activo">
+            <span aria-hidden="true">🧭</span>
+            <span>(sin flujo)</span>
+          </span>
+        </div>
+      </div>
+
+  <div class="controls ml-auto flex items-center gap-2" aria-label="Controles del editor">
+       
+      
+         <span class="panel-toggles inline-flex items-center gap-2 ml-3">
+          <button id="togglePaletteBtn" title="Mostrar / Ocultar paleta" class="px-3 py-1 bg-white border rounded text-sm">
+            <span class="inline-flex items-center gap-2">
+              <span aria-hidden="true">🛠️</span>
+              <span>Nodos</span>
+            </span>
+          </button>
+         
+        </span>
+        <button id="btnOpenFlows" class="px-3 py-1 bg-white border rounded text-sm" title="Gestionar flujos del proyecto">
+          <span class="inline-flex items-center gap-2">
+            <svg aria-hidden="true" class="w-4 h-4 text-sky-600" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M4 6h16v2H4zM4 11h16v2H4zM4 16h10v2H4z"></path>
+            </svg>
+            <span>Flujos</span>
+          </span>
+        </button>
+        <button id="btnExport" class="px-3 py-1 bg-white border rounded text-sm">
+          <span class="inline-flex items-center gap-2">
+            <!-- Floppy disk icon -->
+            <svg aria-hidden="true" class="w-4 h-4 text-gray-700" viewBox="0 0 24 24" fill="currentColor">
+              <rect x="3" y="3" width="18" height="18" rx="2"></rect>
+              <rect x="7" y="4.5" width="7" height="6" fill="white" opacity="0.9"></rect>
+              <rect x="7" y="14" width="10" height="5" fill="white" opacity="0.9"></rect>
+              <rect x="9" y="15" width="6" height="2.5" rx="0.5" class="fill-gray-300"></rect>
+            </svg>
+            <span>Guardar</span>
+          </span>
+        </button>
+    <button id="btnOpenSimulatorModal" title="Abrir simulador en modal" class="px-3 py-1 bg-white border rounded text-sm">
+      <span class="inline-flex items-center gap-2">
+        <!-- Play icon (green) -->
+        <svg aria-hidden="true" class="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+          <path d="M8 5v14l11-7-11-7z"></path>
+        </svg>
+        <span>Simulador</span>
+      </span>
+    </button>
+  <button id="btnShowJson" title="Ver JSON generado" class="px-3 py-1 bg-white border rounded text-sm">
+    <span class="inline-flex items-center gap-2">
+      <!-- Code brackets icon -->
+      <svg aria-hidden="true" class="w-4 h-4 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M9 8L5 12l4 4"/>
+        <path d="M15 8l4 4-4 4"/>
+      </svg>
+      <span>Ver JSON</span>
+    </span>
+  </button>
+
+        <span class="zoom-controls inline-flex items-center gap-2 ml-2">
+          <button id="zoomOut" title="Alejar" class="px-2 py-1 bg-white border rounded">−</button>
+          <span id="zoomLabel" class="min-w-[56px] text-center font-semibold">100%</span>
+          <button id="zoomIn" title="Acercar" class="px-2 py-1 bg-white border rounded">+</button>
+          <button id="btnCenterCanvas" title="Centrar canvas al contenido" class="px-2 py-1 bg-white border rounded">
+            <span class="inline-flex items-center gap-2">
+              <!-- Crosshair/Target icon -->
+              <svg aria-hidden="true" class="w-4 h-4 text-sky-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="6"></circle>
+                <path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path>
+              </svg>
+            </span>
+          </button>
+         
+        </span>
+
+        <!-- Botón de ayuda global -->
+        <button id="btnHelpDoc" title="Ayuda de expresiones (len, split, etc.)" class="px-2 py-1 bg-white border rounded" aria-label="Ayuda">
+          <span class="inline-flex items-center gap-2">
+            <span aria-hidden="true">ℹ️</span>
+            <span class="text-sm">Ayuda</span>
+          </span>
+        </button>
+
+  <input id="importFile" type="file" accept=".json" multiple class="text-sm file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 hidden" />
+  <input id="importFolder" type="file" accept=".json" webkitdirectory directory multiple class="hidden" />
+
+       
+
+        
+      </div>
+    </div>
+  </header>
+
+  <main>
+  <aside id="palette" aria-label="Paleta de nodos">
+      <h2>Nodos</h2>
+      
+      <div class="draggable start-special" draggable="true" data-type="start" title="Nodo de inicio del flujo (solo 1 por flujo)">🚀 Start</div>
+            <div class="draggable" draggable="true" data-type="response">📣 Response</div>
+      <div class="draggable" draggable="true" data-type="input">⌨️ Input</div>
+  <div class="draggable" draggable="true" data-type="assign_var">🔧 Assign Variable</div>
+  <div class="draggable" draggable="true" data-type="button">🔘 Button</div>
+  <div class="draggable" draggable="true" data-type="multi_button" title="Permite seleccionar varias opciones">🧩 Multi-Button</div>
+      <div class="draggable" draggable="true" data-type="rest_call">🔗 API REST Call</div>
+
+  <div class="draggable" draggable="true" data-type="foreach" title="Itera sobre una lista (simple)">🔁 ForEach</div>
+
+ 
+      <div class="draggable" draggable="true" data-type="form">📝 Form</div>
+    <div class="draggable" draggable="true" data-type="choice_switch" title="Choice (switch): evalúa casos y salta automáticamente">🔀 Choice (switch)</div>
+    <div class="draggable" draggable="true" data-type="flow_jump" title="Llama a otro flujo y puede volver al origen">⤴️ Flow Jump</div>
+      
+  <div class="draggable" draggable="true" data-type="condition">❓ Condition (If)</div>
+  <div class="draggable" draggable="true" data-type="set_goto">🔙 Set Goto</div>
+  <div class="draggable" draggable="true" data-type="end" title="Nodo fin del flujo">🏁 End</div>
+  
+  
+    </aside>
+
+    <section id="canvasSection" aria-label="Canvas de diseño">
+      <h2>Canvas</h2>
+      <section id="canvas" aria-label="Canvas de diseño">
+        <div id="canvasInner"></div>
+      </section>
+    </section>
+
+    <aside id="properties" aria-label="Panel de propiedades">
+      <h2>Propiedades</h2>
+      
+  <output id="noSelection" aria-live="polite">Selecciona un nodo en el canvas para editar sus propiedades.</output>
+      <form id="propForm" style="display:none;">
+        <div class="form-row">
+          <label for="prop_id">ID nodo</label>
+          <input type="text" id="prop_id" required />
+        </div>
+        <div class="form-row">
+          <label for="prop_type">Tipo</label>
+          <input type="text" id="prop_type" disabled />
+        </div>
+        <div id="dynamicProps"></div>
+        <div class="form-row">
+          <label for="variablesList">Variables detectadas en el flujo</label>
+          <div id="variablesList">(sin variables definidas)</div>
+        </div>
+
+        <div class="form-row actions flex gap-2 mt-4">
+          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700 transition font-semibold text-sm">Aplicar</button>
+          <button type="button" id="btnDeleteNode" class="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition font-semibold text-sm">Eliminar nodo</button>
+        </div>
+      </form>
+    </aside>
+  </main>
+
+
+    <div id="simulatorPanel" class="simulator-panel border rounded p-2 bg-white">
+      <div id="simulatorTimeline" class="sim-timeline h-40 overflow-auto" style="min-height:120px;">Registro de ejecución del simulador</div>
+      <div id="simulatorCanvasPreview" class="sim-canvas-preview mt-2 h-48 border rounded p-2 bg-gray-50" style="min-height:160px; margin-top:8px;">Vista previa del flujo (nodos visitados, variables, respuestas)</div>
+      <div class="mt-2 flex items-center gap-2">
+        <input id="simExtraInput" class="border rounded px-2 py-1 flex-1" placeholder='JSON extra por paso (ej: {"userId":42})' type="text" value="hola" />
+        <button id="simExtraClear" class="px-2 py-1 bg-white border rounded text-sm" title="Limpiar JSON extra">Limpiar</button>
+      </div>
+      <div class="mt-2 flex items-center gap-2">
+        <label for="simTurnSelect" class="text-xs text-gray-600">turn</label>
+        <select id="simTurnSelect" class="border rounded px-2 py-1 text-sm">
+          <option value="">(no inyectar)</option>
+          <option value="user">user</option>
+          <option value="assistant">assistant</option>
+        </select>
+        <button id="simTurnClear" class="px-2 py-1 bg-white border rounded text-sm" title="Limpiar turn">Limpiar</button>
+      </div>
+      <div class="mt-2 flex items-center gap-2">
+        <input id="simOriginInput" class="border rounded px-2 py-1 flex-1" placeholder='origin (JSON) ej: {"role":"user","value":"hola","node":"n1"}' type="text" />
+        <button id="simOriginClear" class="px-2 py-1 bg-white border rounded text-sm" title="Limpiar origin">Limpiar</button>
+      </div>
+      <div class="text-xs text-gray-500 mt-1">El campo extra es efímero por paso. Si quieres conservarlo, asígnalo a una variable con un nodo AssignVar.</div>
+      <div class="text-xs text-gray-500">Los campos turn y origin también son efímeros por paso; se limpian automáticamente tras cada paso.</div>
+    </div>
+  </section>
+  <section id="jsonOutSection">
+    <h2>JSON generado</h2>
+    <pre id="jsonOutput">{ }</pre>
+  </section>
+
+  <script src="https://cdn.jsdelivr.net/npm/jsplumb@2.15.6/dist/js/jsplumb.min.js"></script>
+  <script src="js/formbuilder.js"></script>
+  <script src="js/renderers/common.js"></script>
+  <script src="js/renderers/validation.js"></script>
+  <script src="js/renderers/button.js"></script>
+  <script src="js/renderers/multi_button_panel.js"></script>
+  <script src="js/renderers/rest_call.js"></script>
+  <script src="js/renderers/foreach.js"></script>
+  <script src="js/renderers/while.js"></script>
+  <script src="js/renderers/loop.js"></script>
+  <script src="js/renderers/response.js"></script>
+  <script src="js/renderers/input.js"></script>
+  <script src="js/renderers/choice.js"></script>
+  <script src="js/var_explorer.js"></script>
+  <script src="js/renderers/assign_var.js"></script>
+  <script src="js/renderers/condition.js"></script>
+  <script src="js/renderers/flow_jump.js"></script>
+  <script src="js/renderers/set_goto.js"></script>
+  <script src="js/renderers/start.js"></script>
+  <script src="js/renderers/hero_card.js"></script>
+  <script src="js/renderers/carousel.js"></script>
+  <script src="js/renderers/form.js"></script>
+  <script src="js/renderers/file_upload.js"></script>
+  <script src="js/renderers/json_export.js"></script>
+  <script src="js/renderers/file_download.js"></script>
+  <script src="js/renderers/hidden_response.js"></script>
+  <script src="js/form_renderers.js"></script>
+  <script src="js/connections.js"></script>
+  <script src="js/variables.js"></script>
+  <script src="js/node_renderer.js"></script>
+  <script src="js/node_editor.js"></script>
+  <script src="js/toasts.js"></script>
+  <script src="js/ui_controls.js"></script>
+  <script src="js/compact_mode.js"></script>
+  <script src="js/app_helpers.js"></script>
+  <script src="js/ui_state.js"></script>
+  <script src="js/canvas_drag.js"></script>
+  <script src="js/serializer.js"></script>
+  <script src="js/io.js"></script>
+  <script src="js/node_factory.js"></script>
+  <script src="js/main.js"></script>
+  <script src="js/project_flows.js"></script>
+ <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.umd.js"></script>
+  <script src="js/expression_parser.js"></script>
+  <script src="js/flow_ui.js"></script>
+  <script src="js/flow_runner.js"></script>
+  <script src="js/runtime_demo.js"></script>
+  <script src="js/simulador.js"></script>
+  <script src="js/renderer_usage_report.js"></script>
+  <script src="js/template_selftest.js"></script>
+  <script>
+    // Wire center canvas button
+    document.addEventListener('DOMContentLoaded', () => {
+      const btn = document.getElementById('btnCenterCanvas');
+      btn?.addEventListener('click', () => {
+        try { globalThis.App?.fitCanvasToContent?.(); } catch(e){ console.warn('[UI] fitCanvasToContent failed', e); }
+      });
+    });
+  </script>
+
+  <!-- Modal Flujos -->
+  <div id="flowsModal" class="fixed inset-0 z-[360] hidden items-center justify-center bg-black bg-opacity-40" aria-hidden="true" role="dialog" aria-modal="true" tabindex="-1">
+    <div class="w-full max-w-2xl bg-white rounded-lg shadow-lg overflow-hidden flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between p-4 border-b">
+        <h3 class="text-lg font-semibold">Flujos del proyecto</h3>
+        <button id="flowsModalClose" class="text-gray-600 hover:text-gray-900">✕</button>
+      </div>
+      <div class="p-4 space-y-3 flex-1 overflow-y-auto">
+        <div class="flex items-center gap-2">
+          <button id="btnCreateFlow" class="px-3 py-2 bg-sky-600 text-white rounded text-sm">Nuevo flujo</button>
+          <button id="btnUpsertCurrent" class="px-3 py-2 bg-white border rounded text-sm" title="Guardar/actualizar el flujo abierto en el proyecto">Añadir/Actualizar actual</button>
+          <button id="btnImportFolder" class="px-3 py-2 bg-white border rounded text-sm" title="Importar todos los .json de una carpeta">Abrir carpeta</button>
+        </div>
+        <div id="flowsList" class="divide-y border rounded"></div>
+      </div>
+      <div class="p-3 border-t text-xs text-gray-500">
+        Consejo: marca un flujo como Principal para exportarlo por defecto.
+      </div>
+    </div>
+  </div>
+  <!-- Modal de Ayuda -->
+  <div id="helpModal" class="fixed inset-0 z-[350] hidden items-center justify-center bg-black bg-opacity-40" aria-hidden="true" role="dialog" aria-modal="true" tabindex="-1">
+    <div class="w-full max-w-3xl bg-white rounded-lg shadow-lg overflow-hidden flex flex-col max-h-[80vh]">
+      <div class="flex items-center justify-between p-4 border-b">
+        <h3 class="text-lg font-semibold">Ayuda rápida — Contar elementos y expresiones</h3>
+        <button id="helpModalClose" class="text-gray-600 hover:text-gray-900">✕</button>
+      </div>
+      <div class="p-4 space-y-4 text-sm flex-1 overflow-y-auto">
+        <p>
+          Puedes contar elementos de una lista usando <code class="bg-gray-100 px-1 rounded">len(nombre_lista)</code>.
+          Las expresiones se evalúan en condiciones, asignaciones y plantillas <code class="bg-gray-100 px-1 rounded">{{ ... }}</code>.
+        </p>
+        <div class="p-3 bg-white rounded border">
+          <h4 class="font-semibold mb-2">Operadores soportados</h4>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>Aritméticos: <code class="bg-gray-100 px-1 rounded">+</code>, <code class="bg-gray-100 px-1 rounded">-</code>, <code class="bg-gray-100 px-1 rounded">*</code>, <code class="bg-gray-100 px-1 rounded">/</code></li>
+            <li>Comparación: <code class="bg-gray-100 px-1 rounded">==</code>, <code class="bg-gray-100 px-1 rounded">!=</code>, <code class="bg-gray-100 px-1 rounded">&gt;</code>, <code class="bg-gray-100 px-1 rounded">&lt;</code>, <code class="bg-gray-100 px-1 rounded">&gt;=</code>, <code class="bg-gray-100 px-1 rounded">&lt;=</code></li>
+            <li>Lógicos: <code class="bg-gray-100 px-1 rounded">&&</code>, <code class="bg-gray-100 px-1 rounded">||</code>, <code class="bg-gray-100 px-1 rounded">!</code></li>
+            <li>Ternario: <code class="bg-gray-100 px-1 rounded">cond ? a : b</code></li>
+          </ul>
+          <pre class="bg-gray-100 p-2 rounded text-xs mt-2">len(items) &gt; 0 && startsWith(name, 'A') ? 'OK' : 'KO'</pre>
+        </div>
+
+        <div class="p-3 bg-white rounded border">
+          <h4 class="font-semibold mb-2">Funciones disponibles (con ejemplos)</h4>
+          <ul class="list-disc pl-6 space-y-1">
+            <li><b>len(x)</b>: longitud de string o lista — <code class="bg-gray-100 px-1 rounded">len(items)</code></li>
+            <li><b>split(text, 'sep')</b>: string→lista — <code class="bg-gray-100 px-1 rounded">split('a,b,c', ',')</code></li>
+            <li><b>join(list, 'sep')</b>: lista→string — <code class="bg-gray-100 px-1 rounded">join(items, ';')</code></li>
+            <li><b>toNumber(x)</b>: a número — <code class="bg-gray-100 px-1 rounded">toNumber('42')</code></li>
+            <li><b>parseInt(x)</b>, <b>parseFloat(x)</b> — <code class="bg-gray-100 px-1 rounded">parseInt('10')</code></li>
+            <li><b>bool(x)</b>: coerciona a boolean — <code class="bg-gray-100 px-1 rounded">bool('yes')</code></li>
+            <li><b>trim(s)</b>: recorta espacios — <code class="bg-gray-100 px-1 rounded">trim(' hola ')</code></li>
+            <li><b>contains(hay, needle)</b> — <code class="bg-gray-100 px-1 rounded">contains(name, 'ana')</code></li>
+            <li><b>startsWith(s, pref)</b>, <b>endsWith(s, suf)</b> — <code class="bg-gray-100 px-1 rounded">startsWith(code,'ES-')</code></li>
+            <li><b>upper(x)</b>, <b>lower(x)</b> — <code class="bg-gray-100 px-1 rounded">upper(name)</code></li>
+            <li><b>isEmpty(x)</b>: vacío/null — <code class="bg-gray-100 px-1 rounded">isEmpty(email)</code></li>
+            <li><b>coalesce(a,b,c,...)</b>: primer valor no vacío — <code class="bg-gray-100 px-1 rounded">coalesce(alias, name, 'N/A')</code></li>
+          </ul>
+          <div class="mt-2">
+            <div class="text-xs font-semibold mb-1">Composición:</div>
+            <pre class="bg-gray-100 p-2 rounded text-xs">len(split('a,b,c', ','))   // 3
+join(split('x|y|z','|'), ', ') // "x, y, z"
+coalesce(trim(nickname), name, 'invitado')</pre>
+          </div>
+        </div>
+
+        <div class="p-3 bg-white rounded border">
+          <h4 class="font-semibold mb-2">Uso por contexto</h4>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>Condición: <code class="bg-gray-100 px-1 rounded">len(items) &gt; 0</code></li>
+            <li>Asignación: <code class="bg-gray-100 px-1 rounded">x = toNumber('42')</code></li>
+            <li>Texto: <code class="bg-gray-100 px-1 rounded">Hola {{ upper(user_name) }}</code></li>
+            <li>JSON embebido: escapa comillas — <code class="bg-gray-100 px-1 rounded">{"key":"{{ value }}"}</code></li>
+          </ul>
+        </div>
+
+        <div class="p-3 bg-gray-50 rounded border">
+          <div class="font-semibold mb-1">Insertar ejemplo en el canvas</div>
+          <p class="mb-2">Crea un flujo mínimo con variables, conteo, join y toNumber:</p>
+          <ol class="list-decimal pl-6 space-y-1 mb-3">
+            <li>Start → define variable <code>items</code> como lista</li>
+            <li>Assign: <code>items = split('a,b,c', ',')</code></li>
+            <li>Assign: <code>items_count = len(items)</code></li>
+            <li>Assign: <code>csv = join(items, ';')</code></li>
+            <li>Assign: <code>n = toNumber('42')</code></li>
+            <li>Response: <code>Tienes {{ items_count }} elementos; csv={{ csv }}; n={{ n }}</code></li>
+          </ol>
+          <button id="btnInsertExample" class="px-3 py-2 bg-sky-600 text-white rounded text-sm">Insertar ejemplo</button>
+        </div>
+
+        <hr class="my-2"/>
+        <div>
+          <h4 class="text-base font-semibold">Ayuda del Simulador (resumen)</h4>
+          <div class="mt-2 space-y-3">
+            <div>
+              <h5 class="font-semibold text-sky-600">📝 Variables</h5>
+              <p>Interpolación en textos con <code class="bg-gray-100 px-1 rounded">{{variable}}</code>:</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">Hola {{user_name}}, tienes {{user_age}} años</pre>
+            </div>
+            <div>
+              <h5 class="font-semibold text-sky-600">🎨 Markdown</h5>
+              <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
+                <li><code>**negrita**</code>, <code>*cursiva*</code>, <code># Título</code>, listas y <code>`código`</code></li>
+              </ul>
+            </div>
+            <div>
+              <h5 class="font-semibold text-sky-600">📊 DataInfo</h5>
+              <p>Permite construir JSON con variables interpoladas:</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">{"user":"{{user_name}}","age":{{user_age}}}</pre>
+            </div>
+            <div>
+              <h5 class="font-semibold text-sky-600">💡 Consejos</h5>
+              <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
+                <li>Las variables y Markdown se renderizan en el chat del simulador</li>
+                <li>Escapa comillas en JSON cuando sea necesario</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="text-base font-semibold">Ejemplos por tipo de elemento</h4>
+          <div class="mt-2">
+            <details class="mb-2"><summary class="font-semibold">Start</summary>
+              <p class="text-xs mt-1">Declara variables iniciales del flujo.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">variables: [
+  { "name": "items", "isList": true, "defaultValue": "[]" },
+  { "name": "user_name", "defaultValue": "" }
+]</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Response</summary>
+              <p class="text-xs mt-1">Muestra texto (array de strings). Soporta Markdown y {{ vars }}.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">i18n: { es: { text: [
+  "Hola {{ user_name }}", "Tienes {{ len(items) }} elementos"
+]}}</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Input</summary>
+              <p class="text-xs mt-1">Pide un valor y lo guarda en una variable.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">i18n: { es: { prompt: "Tu nombre" } },
+save_as: "user_name"</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Assign Variable</summary>
+              <p class="text-xs mt-1">Asigna valores (expresiones soportadas: len, split, join, toNumber, bool...).</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">assignments: [
+  { "target": "items", "value": "split('a,b,c', ',')" },
+  { "target": "items_count", "value": "len(items)" },
+  { "target": "csv", "value": "join(items, ';')" },
+  { "target": "n", "value": "toNumber('42')" },
+  { "target": "user.name", "value": "'Ana'" }
+]</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Condition</summary>
+              <p class="text-xs mt-1">Evalúa una expresión booleana y redirige por true/false.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">expr: "len(items) &gt; 0",
+true_target: { node_id: "res_ok" },
+false_target: { node_id: "res_vacio" }</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">ForEach</summary>
+              <p class="text-xs mt-1">Itera una lista y expone <code>item</code> y <code>index</code>.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">type: "foreach",
+source_list: "items",
+item_var: "item",
+index_var: "index",
+loop_body: { node_id: "resp_item" }</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Button/Choice</summary>
+              <p class="text-xs mt-1">Ofrece opciones; cada opción apunta a un siguiente nodo.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">options: [
+  { "label": "Sí", "target": { "node_id": "n_ok" } },
+  { "label": "No", "target": { "node_id": "n_ko" } }
+]</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">REST Call</summary>
+              <p class="text-xs mt-1">Realiza llamadas HTTP. Soporta {{variables}} en la URL.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">method: "GET",
+url: "https://api.example.com/user/{{ user_id }}",
+save_as: "resp"</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Set Goto</summary>
+              <p class="text-xs mt-1">Fija la variable de salto (goto) para redirigir el flujo.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">target: "nodo_destino"</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Form</summary>
+              <p class="text-xs mt-1">Recolecta varios campos en una sola interacción.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">fields: [
+  { "name": "email", "label": "Email", "type": "text" },
+  { "name": "age", "label": "Edad", "type": "number" }
+]</pre>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <script>
+    // Help modal wiring + Insert example flow
+    (function(){
+      const openBtn = document.getElementById('btnHelpDoc');
+      const modal = document.getElementById('helpModal');
+      const closeBtn = document.getElementById('helpModalClose');
+      const insertBtn = document.getElementById('btnInsertExample');
+      function open(){ if (modal){ modal.classList.remove('hidden'); modal.classList.add('flex'); } }
+      function close(){ if (modal){ modal.classList.add('hidden'); modal.classList.remove('flex'); } }
+      openBtn?.addEventListener('click', open);
+      closeBtn?.addEventListener('click', close);
+      modal?.addEventListener('click', (e)=>{ if(e.target===modal) close(); });
+
+      insertBtn?.addEventListener('click', () => {
+        try {
+          // Crear nodos de ejemplo usando la API expuesta por App/AppNodeFactory
+          // 1) Start
+          let start = null;
+          if (window.App && typeof window.App.createNode === 'function') {
+            start = window.App.createNode('start', 120, 100);
+          } else if (window.AppNodeFactory && typeof window.AppNodeFactory.createNode === 'function') {
+            start = window.AppNodeFactory.createNode('start', 120, 100);
+          }
+          if (!start) return;
+          const state = window.App?.state;
+          // Añadir variable items como lista declarada en Start
+          try {
+            start.variables = start.variables || [];
+            if (!start.variables.find(v=>v.name==='items')) start.variables.push({ name:'items', isList: true, defaultValue: '' });
+            if (!start.variables.find(v=>v.name==='items_count')) start.variables.push({ name:'items_count', isList: false, defaultValue: '0' });
+          } catch(e) { console.warn('[helpModal] No se pudo actualizar variables en Start', e); }
+
+          // 2) Assign: items = split('a,b,c', ',')
+          const n1 = window.App.createNode('assign_var', 360, 100);
+          n1.assignments = [{ target:'items', value: "split('a,b,c', ',')" }];
+          start.next = { flow_id:'', node_id: n1.id };
+
+          // 3) Assign: items_count = len(items)
+          const n2 = window.App.createNode('assign_var', 600, 100);
+          n2.assignments = [{ target:'items_count', value: 'len(items)' }];
+          n1.next = { flow_id:'', node_id: n2.id };
+
+          // 4) Assign: csv = join(items, ';')
+          const n3 = window.App.createNode('assign_var', 840, 100);
+          n3.assignments = [{ target:'csv', value: "join(items, ';')" }];
+          n2.next = { flow_id:'', node_id: n3.id };
+
+          // 5) Assign: n = toNumber('42')
+          const n4 = window.App.createNode('assign_var', 1080, 100);
+          n4.assignments = [{ target:'n', value: "toNumber('42')" }];
+          n3.next = { flow_id:'', node_id: n4.id };
+
+          // 6) Response: muestra items_count, csv y n
+          const n5 = window.App.createNode('response', 1320, 100);
+          const locales = (state?.meta?.locales && state.meta.locales.length) ? state.meta.locales : ['es'];
+          n5.i18n = n5.i18n || {}; locales.forEach(l => { n5.i18n[l] = n5.i18n[l] || {}; n5.i18n[l].text = [ 'Tienes {{ items_count }} elementos; csv={{ csv }}; n={{ n }}' ]; });
+          n4.next = { flow_id:'', node_id: n5.id };
+
+          // Render y conexiones
+          if (window.App && typeof window.App.refreshOutput === 'function') window.App.refreshOutput();
+          if (window.App && typeof window.App.ensureNodeVisible === 'function') window.App.ensureNodeVisible(n5, 120);
+          close();
+        } catch (err) {
+          console.warn('[helpModal] No se pudo insertar el ejemplo', err);
+        }
+      });
+    })();
+  </script>
+    <script>
+      // Carga perezosa de componentes de paneles (loop, condition, response...) para desacoplar formularios.
+      (async function loadPropertyPanelTemplates(){
+        // If opened via file:// protocol, skip fetching components to avoid CORS errors
+        if (location.protocol === 'file:') {
+          console.warn('[PanelTemplates] Ejecutando desde file:// — omitiendo carga de templates para evitar CORS. Inicia el servidor y abre http://localhost:8000');
+          window.__panelTemplatesReady = true;
+          document.dispatchEvent(new CustomEvent('panelTemplates:ready'));
+          return;
+        }
+        const componentFiles = [
+          'components/panel-start.html',
+          'components/panel-response.html',
+          'components/panel-input.html',
+          'components/panel-assign_var.html',
+          'components/panel-rest_call.html',
+          'components/panel-condition.html',
+          'components/panel-set_goto.html',
+          'components/panel-loop.html',
+          'components/panel-form.html',
+          'components/panel-button.html',
+          'components/panel-multi_button.html'
+        ];
+        
+        // Intentar cargar con fetch, pero con timeout y reintentos
+        const loadTemplate = async (path, retries = 3) => {
+          for (let i = 0; i < retries; i++) {
+            try {
+              const controller = new AbortController();
+              const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
+              
+              const res = await fetch(path, { 
+                cache: 'no-store', 
+                signal: controller.signal 
+              });
+              clearTimeout(timeoutId);
+              
+              if (!res.ok) continue;
+              const html = await res.text();
+              const tmp = document.createElement('div');
+              tmp.innerHTML = html;
+              // mover templates al document.head para fácil querySelector
+              tmp.querySelectorAll('template').forEach(t => document.head.appendChild(t));
+              return true;
+            } catch (err) {
+              console.warn(`Intento ${i + 1} falló para ${path}:`, err.message);
+              if (i < retries - 1) await new Promise(resolve => setTimeout(resolve, 1000)); // wait 1s before retry
+            }
+          }
+          console.warn(`No se pudo cargar componente ${path} después de ${retries} intentos`);
+          return false;
+        };
+        
+        const promises = componentFiles.map(path => loadTemplate(path));
+        await Promise.allSettled(promises);
+        
+        window.__panelTemplatesReady = true;
+        document.dispatchEvent(new CustomEvent('panelTemplates:ready'));
+      })();
+    </script>
+  <!-- JSON modal -->
+
+  <style>
+    /* Layout modal simulator: left debug 40% / right chat 60%; responsive stack on small screens */
+    .simulator-grid {
+      display: grid;
+      grid-template-columns: 40% 60%;
+      gap: 0;
+      height: calc(90vh - 56px);
+    }
+    @media (max-width: 768px){
+      .simulator-grid { grid-template-columns: 1fr; height: auto; }
+      .simulator-grid aside { order: -1; }
+    }
+    /* Ensure pre elements in debug are readable */
+    #simulatorDebugPanel pre { color: #111827; background: #ffffff; }
+  </style>
+
+  <div id="jsonModal" class="modal-overlay" style="display:none" aria-hidden="true">
+    <div class="modal-dialog">
+      <div class="modal-header">
+        <h3>JSON generado</h3>
+        <button id="jsonModalClose" class="modal-close">✕</button>
+      </div>
+      <div class="modal-body">
+        <div class="modal-actions">
+          <button id="jsonModalCopy" class="px-3 py-1 bg-sky-600 text-white rounded text-sm">Copiar al portapapeles</button>
+        </div>
+        <pre id="jsonModalContent" class="json-content">{ }</pre>
+      </div>
+    </div>
+  </div>
+  <!-- Simulador Modal (chat) -->
+  <div id="simulatorModal" class="fixed inset-0 z-[300] hidden items-center justify-center bg-black bg-opacity-40" aria-hidden="true">
+    <div class="w-full max-w-6xl h-[90vh] bg-white rounded-lg shadow-lg flex flex-col overflow-hidden">
+      <!-- Modal header -->
+      <div class="flex items-center justify-between p-4 border-b">
+        <h3 class="text-lg font-semibold">Simulador — Chat</h3>
+        <div class="flex items-center gap-2">
+ 
+          <button id="btnShowHelp" class="px-3 py-1 bg-white border rounded text-sm" title="Mostrar ayuda">?</button>
+          <button id="simulatorModalClose" class="text-gray-600 hover:text-gray-900">✕</button>
+        </div>
+      </div>
+
+      <!-- Modal body: grid 40/60 -->
+      <div class="modal-body flex-1 overflow-hidden p-4">
+        <div class="simulator-grid h-full">
+          <!-- Left: debug panel (40%) -->
+          <aside id="simulatorDebugPanel" aria-label="Panel de depuración del simulador" class="border-r bg-gray-50 p-4 flex flex-col gap-4 overflow-auto text-xs">
+            <div>
+              <h4 class="font-semibold mb-1 text-sm">Flow JSON</h4>
+              <pre id="debugFlowJson" class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">{}</pre>
+            </div>
+            <div>
+              <h4 class="font-semibold mb-1 text-sm">Nodo actual</h4>
+              <pre id="debugCurrentNode" class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">{}</pre>
+            </div>
+            <div>
+              <h4 class="font-semibold mb-1 text-sm">Variables</h4>
+              <pre id="debugVariables" class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">{}</pre>
+            </div>
+            <div>
+              <h4 class="font-semibold mb-1 text-sm">Call stack</h4>
+              <pre id="debugCallStack" class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">(vacía)</pre>
+            </div>
+            <div>
+              <h4 class="font-semibold mb-1 text-sm">Diff variables</h4>
+              <pre id="debugVarDiff" class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">(sin cambios)</pre>
+            </div>
+            <div>
+              <h4 class="font-semibold mb-1 text-sm">Editar variables</h4>
+              <div id="simulatorVarsList" class="space-y-2 overflow-auto bg-white border rounded p-2" style="max-height:28vh"></div>
+            </div>
+            <div class="mt-auto">
+              <button id="btnVarsSave" class="w-full mb-2 px-3 py-2 bg-sky-600 text-white rounded text-sm">Guardar variables</button>
+              <button id="btnVarsReset" class="w-full px-3 py-2 bg-white border rounded text-sm">Reset variables</button>
+            </div>
+          </aside>
+
+          <!-- Right: chat (60%) -->
+          <div class="flex-1 flex flex-col overflow-hidden bg-white">
+            <div class="p-4 border-b bg-gray-50">
+              <h4 class="font-semibold">Chat del simulador</h4>
+            </div>
+            <div id="simulatorChat" class="p-4 flex-1 overflow-auto bg-gray-50"></div>
+            <div class="p-4 border-t bg-white flex gap-2 items-center">
+              <input id="simulatorInputBox" type="text" placeholder="Escribe tu respuesta..." class="flex-1 px-3 py-2 border rounded-md" />
+              <button id="simulatorSendBtn" class="px-4 py-2 bg-sky-600 text-white rounded">Enviar</button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</body>
+
+  <!-- JSON modal -->
+
+</body>
+</html>

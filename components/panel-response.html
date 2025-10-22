@@ -1,0 +1,17 @@
+<template id="panel-response-template">
+  <section class="prop-panel-response">
+    <header class="mb-2">
+      <h3 class="text-sm font-semibold text-emerald-700">📣 Response</h3>
+      <p class="text-xs text-emerald-600">Mensajes de salida multi‑locale y datos adicionales.</p>
+    </header>
+    <div class="response-form-slot space-y-3" data-required-field-group="response">
+      <div id="response_locales_container" class="space-y-2" data-required-field="response.locales_container"></div>
+      <div class="form-row" data-field="dataInfo" data-required-field="response.dataInfo">
+        <label for="response_dataInfo" class="block text-xs font-medium text-gray-700">Data Info (opcional)</label>
+        <input type="text" id="response_dataInfo" placeholder='ej: {{user_name}} o {"k": "{{val}}"}' class="mt-1 w-full border rounded px-2 py-1 text-sm" />
+        <small class="text-[11px] text-gray-500">Expresión evaluada y asignada a <code>dataInfo</code>. Usa {{variable}} para interpolación.</small>
+      </div>
+      <div id="response_validation_box" class="validation-box mt-2 p-2 border rounded bg-gray-50 text-xs" data-required-field="response.validation_box"></div>
+    </div>
+  </section>
+</template>

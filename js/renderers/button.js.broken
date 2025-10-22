@@ -1,0 +1,252 @@
+// button.js - renderer del nodo button
+(function(){
+  const { safe, deriveLocales, adoptTemplate, setupValidation, markFieldUsed } = window.RendererHelpers || {};
+  const H = window.FormBuilderHelpers || {};
+  const inputRow = H.inputRow || function(){ return document.createElement('div'); };
+  const el = H.el || function(tag, attrs={}, children=[]){ const e=document.createElement(tag); (children||[]).forEach(c=>e.appendChild(c)); return e; };
+
+  function hasStaticLabels(btns){ return Array.isArray(btns) && btns.some(b => b?.i18n && Object.values(b.i18n).some(v => (v?.text||'').trim()!=='')); }
+
+  function renderButton(node, container, nodeIds){
+    container = adoptTemplate(container, 'button', 'button-form-slot');
+    function collectButtonState(){
+      const qv = sel => container.querySelector(sel)?.value?.trim();
+      const btns = Array.isArray(node.options) ? node.options : [];
+      return {
+        mode: qv('#button_mode') || 'static',
+        optional: !!container.querySelector('#btn_optional')?.checked,
+        src: qv('#btn_source_list input, #btn_source_list'),
+        labelExpr: qv('#btn_label_expr input, #btn_label_expr'),
+        valueExpr: qv('#btn_value_expr input, #btn_value_expr'),
+        btns,
+        locales: deriveLocales(node, ['es']),
+        hasStaticLabels: hasStaticLabels(btns)
+      };
+    }
+    function buildButtonRules(st){
+      const rules=[];
+      if(st.mode==='dynamic'){
+        rules.push({kind:'error', when:!st.src, msg:'Debes indicar la lista (source_list) para modo dinámico.', field:'#btn_source_list'});
+        rules.push({kind:'warning', when:!st.labelExpr, msg:'Sin label_expr: se intentará usar item.label o item.name.', field:'#btn_label_expr'});
+        rules.push({kind:'warning', when:!st.valueExpr, msg:'Sin value_expr: se usará el item completo como valor.', field:'#btn_value_expr'});
+      } else {
+        rules.push({kind:'error', when:!st.hasStaticLabels && !st.optional, msg:'Debes definir al menos una opción estática o marcar el botón como opcional.'});
+        rules.push({kind:'warning', when:!st.hasStaticLabels && st.optional, msg:'Botón opcional sin opciones: se saltará en ejecución.'});
+      }
+      return rules;
+    }
+
+    function infoIcon(text){ const wrap=el('span',{class:'info-tip','data-tip':text}); wrap.textContent='ⓘ'; return wrap; }
+
+    // Floating tooltip (singleton)
+    let floatingTip=document.getElementById('floatingFieldTooltip');
+    if(!floatingTip){
+      floatingTip=document.createElement('div');
+      floatingTip.id='floatingFieldTooltip';
+      floatingTip.className='floating-field-tooltip';
+      document.body.appendChild(floatingTip);
+    }
+    function showFloatingTip(ev,text){
+      if(!text){
+        return;
+      }
+      floatingTip.textContent=text;
+      floatingTip.style.display='block';
+      const r=ev.target.getBoundingClientRect();
+      floatingTip.style.left=(r.left+window.scrollX+r.width/2)+'px';
+      floatingTip.style.top=(r.top+window.scrollY-8-floatingTip.offsetHeight)+'px';
+    }
+    function hideFloatingTip(){ floatingTip.style.display='none'; }
+    container.addEventListener('mouseover',e=>{ const t=e.target.closest('.info-tip'); if(t) showFloatingTip(e,t.getAttribute('data-tip')); });
+    container.addEventListener('mouseout',e=>{ if(e.target.closest('.info-tip')) hideFloatingTip(); });
+
+    // Localized texto base
+    const locales = deriveLocales(node, ['en']);
+    locales.forEach(loc=>{
+      const val = node.i18n?.[loc]?.text || '';
+      container.appendChild(inputRow({label:`Texto (${loc})`, id:`i18n_text_${loc}`, value:val}));
+    });
+
+    // Mode selector
+    const modeRow=el('div',{class:'form-row flex items-center gap-2'});
+    const modeLbl=el('label',{text:'Modo'});
+    modeLbl.appendChild(infoIcon('static: lista fija de opciones. dynamic: genera opciones desde una lista (source_list).'));
+    modeRow.appendChild(modeLbl);
+    const modeSel=el('select',{id:'button_mode'});
+    ['static','dynamic'].forEach(m=>{
+      const opt=el('option',{value:m,text:m});
+      if((node.mode||'static')===m){ opt.selected=true; }
+      modeSel.appendChild(opt);
+    });
+    modeRow.appendChild(modeSel);
+    container.appendChild(modeRow);
+
+    // Variant selector
+    const variantRow=el('div',{class:'form-row flex items-center gap-2'});
+    const varLbl=el('label',{text:'Variante'});
+    varLbl.appendChild(infoIcon('Define el estilo semántico (primary/secondary/tertiary).'));
+    variantRow.appendChild(varLbl);
+    const variantSel=el('select',{id:'button_variant'});
+    ['primary','secondary','tertiary'].forEach(v=>{
+      const opt=el('option',{value:v,text:v});
+      if((node.variant||'primary')===v){ opt.selected=true; }
+      variantSel.appendChild(opt);
+    });
+    variantRow.appendChild(variantSel);
+    container.appendChild(variantRow);
+
+    // Provider section (dynamic mode)
+    const providerWrap=el('div',{id:'button_provider_wrap',class:'provider-wrap border rounded p-2 mb-2 bg-white/70',style:'display:none;position:relative;'});
+    const provHeader=el('div',{class:'flex items-center justify-between mb-1'});
+    provHeader.appendChild(el('div',{class:'text-xs font-semibold text-gray-700',text:'Datos dinámicos'}));
+    const advToggleProv=el('button',{type:'button',text:'Avanzado ▾',class:'px-2 py-1 text-xs rounded bg-blue-50 hover:bg-blue-100 border border-blue-200 transition'});
+    provHeader.appendChild(advToggleProv); providerWrap.appendChild(provHeader);
+    providerWrap.appendChild(inputRow({label:'Lista (source_list)',id:'btn_source_list',value:node.provider?.source_list || node.dynamic_options_from || '',placeholder:'context.items'}));
+    providerWrap.querySelector('#btn_source_list label')?.appendChild(infoIcon('Expresión que debe resolver a un array. Ej: context.productos o context.apiResult.items'));
+
+    function resolveDynamicSourceValue(sourceKey,nodeRef){
+      if(!sourceKey) return null;
+      let payload=null;
+      if(window.Simulador?.getVariable) payload=safe(()=>window.Simulador.getVariable(sourceKey),'preview:getVariable');
+      if(!payload){
+        const startId=window.App?.state?.meta?.start_node; const varsArr=window.App?.state?.nodes?.[startId]?.variables;
+        if(Array.isArray(varsArr)){ const v=varsArr.find(x=>x?.name===sourceKey); if(v) payload=v.defaultValue; }
+      }
+      if(!payload) payload=nodeRef.provider?.previewData;
+      return payload;
+    }
+    function openPreviewModal(sourceKey,payload){
+      const val = payload;
+      let text;
+      if(typeof val==='string') text=val; else text=safe(()=>JSON.stringify(val,null,2),'preview:stringify')||String(val);
+      const pre=document.createElement('pre');
+      pre.style.cssText='background:#f8fafc;border:1px solid #e6eef6;padding:8px;border-radius:6px;max-height:60vh;overflow:auto;font-size:11px;';
+      pre.textContent=text;
+      const bodyEl=document.createElement('div');
+      bodyEl.appendChild(pre);
+      window.UIHelpers?.createModal({
+        title:'Contenido conocido — '+(sourceKey||'(sin clave)'),
+        bodyEl,
+        actions:[{label:'Cerrar', kind:'primary'}]
+      });
+    }
+    const previewBtnRow=el('div',{class:'form-row'});
+    const previewBtn=el('button',{type:'button',text:'Ver contenido conocido',class:'px-2 py-1 text-sm rounded bg-gray-100 border'});
+    previewBtn.addEventListener('click',()=>{ const sourceKey=(container.querySelector('#btn_source_list input, #btn_source_list')?.value||'').trim(); const payload=resolveDynamicSourceValue(sourceKey,node); if(!payload){ alert('No se encontró contenido conocido para la fuente: '+(sourceKey||'(vacío)')+'\nEjecuta la simulación o define node.provider.previewData.'); return; } openPreviewModal(sourceKey,payload); });
+    previewBtnRow.appendChild(previewBtn); providerWrap.appendChild(previewBtnRow);
+    providerWrap.appendChild(inputRow({label:'Campo label (label_expr)',id:'btn_label_expr',value:node.provider?.label_expr || '',placeholder:'item.nombre'}));
+    providerWrap.querySelector('#btn_label_expr label')?.appendChild(infoIcon('Expresión para mostrar cada opción. Variables: item, index. Ej: item.nombre || `Item ${index+1}`'));
+    providerWrap.appendChild(inputRow({label:'Campo valor (value_expr)',id:'btn_value_expr',value:node.provider?.value_expr || '',placeholder:'item.id'}));
+
+    const exprExamples=el('div',{class:'expr-examples flex flex-wrap gap-2 mt-1 mb-2'});
+    [
+      {t:'Label: fallback',l:'item.nombre || `Item ${index+1}`',target:'#btn_label_expr'},
+      {t:'Label: código+nombre',l:'`${item.codigo} - ${item.nombre}`',target:'#btn_label_expr'},
+      {t:'Value: id',l:'item.id',target:'#btn_value_expr'},
+      {t:'Value: JSON',l:'JSON.stringify(item)',target:'#btn_value_expr'}
+    ].forEach(ex=>{
+      const b=el('button',{type:'button',text:ex.t,class:'px-2 py-1 text-xs rounded bg-slate-100 hover:bg-slate-200 border border-slate-300 example-btn'});
+      b.addEventListener('click',()=>{ const field=container.querySelector(ex.target+' input, '+ex.target+' textarea, '+ex.target); if(field){ field.value=ex.l; field.dispatchEvent(new Event('input',{bubbles:true})); }});
+      exprExamples.appendChild(b);
+    });
+    providerWrap.appendChild(exprExamples);
+    providerWrap.querySelector('#btn_value_expr label')?.appendChild(infoIcon('Valor que se guardará. Ej: item.id, JSON.stringify(item), item.codigo'));
+
+    const providerAdvanced=el('div',{id:'btn_provider_advanced',style:'display:none;'});
+    providerAdvanced.appendChild(inputRow({label:'Filtro (filter_expr)',id:'btn_filter_expr',value:node.provider?.filter_expr || '',placeholder:'item.activo'}));
+    providerAdvanced.querySelector('#btn_filter_expr label')?.appendChild(infoIcon('Mantiene solo ítems que cumplan la condición. Ej: item.stock > 0'));
+    providerAdvanced.appendChild(inputRow({label:'Orden (sort_expr)',id:'btn_sort_expr',value:node.provider?.sort_expr || '',placeholder:'item.orden'}));
+    providerAdvanced.querySelector('#btn_sort_expr label')?.appendChild(infoIcon('Criterio de orden; se evalúa y se usa para sort ascendente. Ej: item.prioridad'));
+    providerWrap.appendChild(providerAdvanced); container.appendChild(providerWrap);
+    advToggleProv.addEventListener('click',()=>{ const visible=providerAdvanced.style.display!=='none'; providerAdvanced.style.display=visible?'none':'block'; advToggleProv.textContent=visible?'Avanzado ▾':'Avanzado ▴'; });
+
+    // Optional
+    const optRow=el('div',{class:'form-row flex items-center gap-2'});
+    const optChk=el('input',{type:'checkbox',id:'btn_optional'}); optChk.checked=!!node.optional; optRow.appendChild(optChk);
+    const optLbl=el('label',{text:'Paso opcional (si no hay selección se omite)'}); optLbl.appendChild(infoIcon('Si está marcado y no hay opciones ni entrada, el flujo continúa automáticamente.'));
+    optRow.appendChild(optLbl); container.appendChild(optRow);
+
+    // Static buttons list
+    const btns=Array.isArray(node.options)?node.options:[];
+    if(btns.length===0) btns.push({i18n:{},next:null});
+    const listRow=el('div',{class:'form-row'});
+    listRow.appendChild(el('label',{text:'Botones (etiqueta por idioma → destino)'}));
+    const list=el('div',{class:'buttons-list'}); Object.assign(list.style,{display:'flex',flexDirection:'column',gap:'6px'});
+    const addBtn=el('button',{type:'button',text:'Añadir opción',class:'mt-2 px-3 py-1 bg-blue-600 text-white rounded text-sm'});
+    addBtn.addEventListener('click',()=>{ btns.push({i18n:{},next:null}); render(); });
+    listRow.appendChild(list); listRow.appendChild(addBtn); container.appendChild(listRow);
+
+  function toggleVisibility(){ const mode=modeSel.value; providerWrap.style.display=mode==='dynamic'?'block':'none'; listRow.style.display=mode==='static'?'block':'none'; runValidation(); }
+  modeSel.addEventListener('change',toggleVisibility);
+  toggleVisibility();
+
+    function createLocaleInputRow(b, loc, idx){
+      const val=b?.i18n?.[loc]?.text ?? b.label ?? '';
+      const labelRow=el('div',{class:'form-row flex items-center gap-2'});
+      labelRow.appendChild(el('label',{text:`Etiqueta (${loc})`}));
+      const inp=el('input',{type:'text',id:`button_${idx}_label_${loc}`,'data-locale':loc});
+      inp.value=val;
+      inp.addEventListener('input',ev=>{
+        b.i18n=b.i18n||{}; b.i18n[loc]=b.i18n[loc]||{}; b.i18n[loc].text=ev.target.value;
+      });
+      labelRow.appendChild(inp);
+      return labelRow;
+    }
+    function renderSingleButtonOption(b,idx){
+      const row=el('div',{class:'button-item','data-index':String(idx)});
+      Object.assign(row.style,{display:'flex',flexDirection:'column',gap:'6px',border:'1px solid #eee',padding:'8px'});
+      const header=el('div',{class:'flex items-center justify-between'});
+      header.appendChild(el('div',{class:'text-xs font-semibold text-gray-600',text:`Opción #${idx+1}`}))
+      const remove=el('button',{type:'button',text:'Eliminar',class:'ml-2 px-2 py-1 bg-red-500 text-white rounded'});
+      remove.addEventListener('click',()=>{ if(btns.length<=1){ alert('Debe existir al menos un botón.'); return; } btns.splice(idx,1); render(); });
+      header.appendChild(remove); row.appendChild(header);
+      const labelsWrap=el('div',{class:'labels-wrap flex flex-col gap-1'});
+      deriveLocales(node,['es']).forEach(loc=>labelsWrap.appendChild(createLocaleInputRow(b,loc,idx)));
+      row.appendChild(labelsWrap);
+      const tgtRow=el('div',{class:'form-row flex items-center gap-2'});
+      tgtRow.appendChild(el('label',{text:'Destino'}));
+      const tgtSel=el('select',{id:`button_tgt_${idx}`,'data-index':String(idx)}); tgtSel.appendChild(el('option',{value:'',text:'(ninguno)'}));
+      nodeIds.forEach(nid=>{ if(nid!==node.id) tgtSel.appendChild(el('option',{value:nid,text:nid})); });
+      if(b.next?.node_id) tgtSel.value=b.next.node_id;
+      tgtSel.addEventListener('change',ev=>{ const v=ev.target.value||''; b.next=v?{flow_id:'',node_id:v}:null; });
+      tgtRow.appendChild(tgtSel); row.appendChild(tgtRow);
+      return row;
+    }
+    function render(){ list.innerHTML=''; btns.forEach((b,idx)=>list.appendChild(renderSingleButtonOption(b,idx))); }
+    render();
+
+    ['btn_source_list','btn_label_expr','btn_value_expr','btn_filter_expr','btn_sort_expr','btn_save_value','btn_save_label','btn_save_index'].forEach(id=>{
+      const inp=container.querySelector('#'+id+' input, #'+id+' textarea, #'+id);
+      if(inp && window.FormBuilderHelpers?.attachVarAutocomplete){
+        safe(()=>window.FormBuilderHelpers.attachVarAutocomplete(inp,{format:'context'}),'attachVarAutocomplete');
+        inp.addEventListener('input',runValidation);
+      }
+    });
+
+    const validator = setupValidation(container, {
+      boxId:'button_validation_box',
+      okMessage:'✔ Sin problemas',
+      collectState: collectButtonState,
+      buildRules: buildButtonRules
+    });
+    function runValidation(){
+      ['btn_source_list','btn_label_expr','btn_value_expr'].forEach(fid=>container.querySelector('#'+fid)?.classList.remove('field-error','field-warning'));
+      validator.run();
+      container.querySelectorAll('.info-tip').forEach(ic=>ic.classList.remove('info-error','info-warning'));
+      ['btn_source_list','btn_label_expr','btn_value_expr'].forEach(fid=>{
+        const host=container.querySelector('#'+fid);
+        if(!host) return;
+        const icon=host.querySelector('.info-tip');
+        if(!icon) return;
+        if(host.classList.contains('field-error')) { icon.classList.add('info-error'); }
+        else if(host.classList.contains('field-warning')) { icon.classList.add('info-warning'); }
+      });
+    }
+    const validationResult = validator.run();
+    markFieldUsed(container.querySelector('.button-form-slot'));
+    document.dispatchEvent(new CustomEvent('renderer:after', { detail: { type:'button', container, validation: validationResult }}));
+  }
+
+  window.RendererRegistry = window.RendererRegistry || {};
+  window.RendererRegistry.button = renderButton;
+})();
