@@ -54,13 +54,66 @@
     }
     noSelection.style.display = 'none';
     propForm.style.display = 'block';
+  try { const aside = document.getElementById('properties'); if (aside) aside.setAttribute('data-node-type', (node.type||'').trim()); } catch(_e){}
     document.getElementById('prop_id').value = node.id;
     document.getElementById('prop_type').value = node.type;
     dynamicProps.innerHTML = '';
-    // call builder
-    const reader = FormBuilder.renderPropsFor(node, dynamicProps, Object.keys(state.nodes));
-    // después de renderizar las propiedades, actualizar listado estático de variables
+  // call builder
+  const reader = FormBuilder.renderPropsFor(node, dynamicProps, Object.keys(state.nodes));
+  // Asegurar que el contenedor dinámico esté visible; filtramos filas indeseadas aparte
+  try { dynamicProps.style.display = ''; } catch(_e){}
+    // Helpers para ocultar/mostrar filas por id de elemento interno
+    function hideRowByInnerId(id){
+      try{
+        const el = document.getElementById(id);
+        const row = el && typeof el.closest === 'function' ? el.closest('.form-row') : null;
+        if(row){ row.style.display = 'none'; row.dataset.hiddenBy = 'end'; }
+      }catch(_e){}
+    }
+    function showRowByInnerId(id){
+      try{
+        const el = document.getElementById(id);
+        const row = el && typeof el.closest === 'function' ? el.closest('.form-row') : null;
+        if(row){ row.style.display = ''; row.dataset.hiddenBy = ''; }
+      }catch(_e){}
+    }
+    // Aplicar reglas de visibilidad para nodo end inmediatamente tras renderizar
+    if (node.type === 'end') {
+      hideRowByInnerId('variablesList');
+      hideRowByInnerId('next_node');
+      hideRowByInnerId('next_flow');
+      try {
+        const nextRow = dynamicProps.querySelector('[data-role="next"]');
+        if (nextRow) nextRow.remove();
+        else {
+          // Fallback: localizar por texto del label en caso de que no exista data-role
+          const labels = dynamicProps.querySelectorAll('label');
+          labels.forEach(l => {
+            const t = (l.textContent||'').trim();
+            if (t.startsWith('Siguiente (flujo')) {
+              const row = l.closest('.form-row') || l.parentElement; if (row) row.remove();
+            }
+          });
+        }
+      } catch(_e){}
+    } else {
+      showRowByInnerId('variablesList');
+      showRowByInnerId('next_node');
+      showRowByInnerId('next_flow');
+      // no-op: la fila de next se re-renderiza en tipos que la usan
+    }
+  // después de renderizar las propiedades, actualizar listado estático de variables
     try { renderVariables(); } catch(e) { /* noop */ }
+  // No ocultamos dynamicProps; sólo removemos/ocultamos lo que no aplica por tipo
+    // Reforzar ocultación tras un posible re-render de variables
+    if (node.type === 'end') {
+      hideRowByInnerId('variablesList');
+      hideRowByInnerId('next_node');
+      hideRowByInnerId('next_flow');
+      try {
+        const nextRow = dynamicProps.querySelector('[data-role="next"]'); if (nextRow) nextRow.remove();
+      } catch(_e){}
+    }
     // attach delete (bloquear eliminación de start)
     const delBtn = document.getElementById('btnDeleteNode');
     if (node.type === 'start' && delBtn) { delBtn.disabled = true; delBtn.title = 'El nodo Start no puede eliminarse'; }

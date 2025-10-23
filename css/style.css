@@ -143,6 +143,16 @@ aside.overlay-visible{display:block}
   content: 'sin end';
   position: absolute;
   top: -8px;
+
+/* Panel propiedades: ocultar "Siguiente" y "Variables" cuando el nodo es de tipo end */
+#properties[data-node-type="end"] #dynamicProps [data-role="next"]{
+  display: none !important;
+}
+#properties[data-node-type="end"] label[for="variablesList"],
+#properties[data-node-type="end"] #variablesList{
+  display: none !important;
+}
+/* Nota: en nodo end mantenemos visible #dynamicProps para mostrar la descripción */
   right: -8px;
   background: #ef4444;
   color: #fff;

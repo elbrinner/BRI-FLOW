@@ -895,9 +895,9 @@ const FormBuilder = (() => {
     } else {
       container.appendChild(jsonEditor({label:'Props (JSON libre)', id:'props_raw', value: node.props || {}}));
     }
-  // next selector for non-choice types (hide for condition and button because they use their own targets)
-  if (node.type !== 'choice' && node.type !== 'condition' && node.type !== 'button' && node.type !== 'flow_jump') {
-      const nextRow = el('div', { class: 'form-row' });
+  // next selector para tipos que usan "next"; ocultar en nodes que no lo usan (choice, condition, button, flow_jump, end)
+  if (node.type !== 'choice' && node.type !== 'condition' && node.type !== 'button' && node.type !== 'flow_jump' && node.type !== 'end') {
+    const nextRow = el('div', { class: 'form-row', 'data-role': 'next' });
       nextRow.appendChild(el('label', { text: 'Siguiente (flujo · nodo)' }));
       // flujo destino
       const flowSel = el('select', { id: 'next_flow', 'data-original': (node.next?.flow_id || '') });
