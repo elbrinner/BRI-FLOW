@@ -133,6 +133,24 @@ aside.overlay-visible{display:block}
 .node.carousel { border-color: #ec4899; background: linear-gradient(90deg,#fdf2f8,#fff); }
 .node.file_upload { border-color: #6b7280; background: linear-gradient(90deg,#f9fafb,#fff); }
 .node.json_export { border-color: #6b7280; background: linear-gradient(90deg,#f9fafb,#fff); }
+/* Highlight for terminal nodes without end (validation) */
+.node.dangling {
+  outline: 2px solid #ef4444; /* red */
+  box-shadow: 0 0 0 3px rgba(239,68,68,0.18), 0 8px 18px rgba(239,68,68,0.15);
+  position: absolute; /* ensure ::after badge positions correctly */
+}
+.node.dangling::after {
+  content: 'sin end';
+  position: absolute;
+  top: -8px;
+  right: -8px;
+  background: #ef4444;
+  color: #fff;
+  font-size: 10px;
+  padding: 2px 6px;
+  border-radius: 999px;
+  box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+}
 /* Locale badges and emphasized start visuals */
 .locales-container { display:flex; gap:6px; margin-bottom:6px; }
 .locale-badge { background: linear-gradient(90deg,#ffffff,#eef2ff); border:1px solid #dbe9ff; color:#174ea6; padding:4px 8px; font-weight:600; font-size:12px; border-radius:12px; box-shadow:0 1px 0 rgba(16,42,67,0.04); }

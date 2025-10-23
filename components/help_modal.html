@@ -1,0 +1,286 @@
+<template id="tpl-help-modal">
+  <!-- Modal de Ayuda (como <dialog> accesible) -->
+  <dialog id="helpModal" class="w-full max-w-3xl p-0">
+    <div class="bg-white flex flex-col rounded-lg shadow-lg overflow-hidden max-h-[80vh]">
+      <div class="flex items-center justify-between p-4 border-b">
+        <h3 class="text-lg font-semibold">Ayuda rápida — Contar elementos y expresiones</h3>
+        <button id="helpModalClose" class="text-gray-600 hover:text-gray-900">✕</button>
+      </div>
+      <div class="p-4 space-y-4 text-sm flex-1 overflow-y-auto">
+        <p>
+          Puedes contar elementos de una lista usando <code class="bg-gray-100 px-1 rounded">len(nombre_lista)</code>.
+          Las expresiones se evalúan en condiciones, asignaciones y plantillas <code class="bg-gray-100 px-1 rounded">{{ ... }}</code>.
+        </p>
+        <div class="p-3 bg-white rounded border">
+          <h4 class="font-semibold mb-2">Operadores soportados</h4>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>
+              Comparación (backend IF):
+              <code class="bg-gray-100 px-1 rounded">==</code>,
+              <code class="bg-gray-100 px-1 rounded">!=</code>,
+              <code class="bg-gray-100 px-1 rounded">&gt;</code>,
+              <code class="bg-gray-100 px-1 rounded">&lt;</code>,
+              <code class="bg-gray-100 px-1 rounded">&gt;=</code>,
+              <code class="bg-gray-100 px-1 rounded">&lt;=</code>
+            </li>
+            <li>
+              Lógicos (backend IF):
+              <code class="bg-gray-100 px-1 rounded">&&</code>,
+              <code class="bg-gray-100 px-1 rounded">||</code>,
+              <code class="bg-gray-100 px-1 rounded">!</code>
+              <span class="text-xs text-gray-500">(sin paréntesis/precedencia avanzada)</span>
+            </li>
+            <li class="text-gray-700">
+              Aritméticos y ternario en editor:
+              <code class="bg-gray-100 px-1 rounded">+</code>,
+              <code class="bg-gray-100 px-1 rounded">-</code>,
+              <code class="bg-gray-100 px-1 rounded">*</code>,
+              <code class="bg-gray-100 px-1 rounded">/</code>,
+              <code class="bg-gray-100 px-1 rounded">cond ? a : b</code>
+              <span class="text-xs text-gray-500">(útiles en plantillas/preview; no evaluados por el IF del backend)</span>
+            </li>
+          </ul>
+          <pre class="bg-gray-100 p-2 rounded text-xs mt-2">len(items) &gt; 0 &amp;&amp; startsWith(name, 'A')</pre>
+        </div>
+
+        <div class="p-3 bg-white rounded border">
+          <h4 class="font-semibold mb-2">Funciones disponibles (con ejemplos)</h4>
+          <ul class="list-disc pl-6 space-y-1">
+            <li><b>len(x)</b> (backend): longitud de string o lista — <code class="bg-gray-100 px-1 rounded">len(items)</code></li>
+            <li><b>split(text, 'sep')</b> (backend): string→lista — <code class="bg-gray-100 px-1 rounded">split('a,b,c', ',')</code></li>
+            <li><b>join(list, 'sep')</b> (backend): lista→string — <code class="bg-gray-100 px-1 rounded">join(items, ';')</code></li>
+            <li><b>toNumber(x)</b> (backend): a número — <code class="bg-gray-100 px-1 rounded">toNumber('42')</code></li>
+            <li><b>trim(s)</b> (backend): recorta espacios — <code class="bg-gray-100 px-1 rounded">trim(' hola ')</code></li>
+            <li><b>upper(x)</b>, <b>lower(x)</b> (backend) — <code class="bg-gray-100 px-1 rounded">upper(name)</code></li>
+            <li><b>contains(hay, needle)</b> (backend) — <code class="bg-gray-100 px-1 rounded">contains(name, 'ana')</code></li>
+            <li><b>startsWith(s, pref)</b>, <b>endsWith(s, suf)</b> (backend) — <code class="bg-gray-100 px-1 rounded">startsWith(code,'ES-')</code></li>
+            <li><b>isEmpty(x)</b> (backend): vacío/null — <code class="bg-gray-100 px-1 rounded">isEmpty(email)</code></li>
+            <li><b>coalesce(a,b,c,...)</b> (backend): primer valor no vacío — <code class="bg-gray-100 px-1 rounded">coalesce(alias, name, 'N/A')</code></li>
+            <li><b>isNull(x)</b>, <b>isNotNull(x)</b> (backend) — <code class="bg-gray-100 px-1 rounded">isNotNull(user_id)</code></li>
+            <li><b>isDefined(x)</b>, <b>isUndefined(x)</b> (backend) — <code class="bg-gray-100 px-1 rounded">isDefined(resp.data)</code></li>
+            <li class="text-gray-700"><b>parseInt(x)</b>, <b>parseFloat(x)</b>, <b>bool(x)</b> (editor): <span class="text-xs text-gray-500">útiles en el editor; el IF backend no las evalúa</span></li>
+          </ul>
+          <div class="mt-2">
+            <div class="text-xs font-semibold mb-1">Composición:</div>
+            <pre class="bg-gray-100 p-2 rounded text-xs">len(split('a,b,c', ','))   // 3
+join(split('x|y|z','|'), ', ') // "x, y, z"
+coalesce(trim(nickname), name, 'invitado')</pre>
+          </div>
+        </div>
+
+        <div class="p-3 bg-white rounded border">
+          <h4 class="font-semibold mb-2">Nulos y vacíos (backend)</h4>
+          <ul class="list-disc pl-6 space-y-1">
+            <li><code class="bg-gray-100 px-1 rounded">undefined</code> se trata como <code class="bg-gray-100 px-1 rounded">null</code> en el backend.</li>
+            <li>¿es nulo o vacío? → <code class="bg-gray-100 px-1 rounded">isEmpty(x)</code></li>
+            <li>¿tiene contenido? → <code class="bg-gray-100 px-1 rounded">!isEmpty(x)</code></li>
+            <li>¿está definido? → <code class="bg-gray-100 px-1 rounded">isDefined(x)</code></li>
+            <li>Equivalencia común: <code class="bg-gray-100 px-1 rounded">x != undefined &amp;&amp; x != null</code> ≈ <code class="bg-gray-100 px-1 rounded">x != null</code></li>
+          </ul>
+          <pre class="bg-gray-100 p-2 rounded text-xs mt-2">isEmpty(email) || len(items) == 0
+ isDefined(resp.data) &amp;&amp; !isEmpty(resp.data)</pre>
+        </div>
+
+        <div class="p-3 bg-white rounded border">
+          <h4 class="font-semibold mb-2">Uso por contexto</h4>
+          <ul class="list-disc pl-6 space-y-1">
+            <li>Condición (backend IF): <code class="bg-gray-100 px-1 rounded">len(items) &gt; 0</code>, <code class="bg-gray-100 px-1 rounded">isEmpty(x)</code></li>
+            <li>Asignación (backend): <code class="bg-gray-100 px-1 rounded">x = toNumber('42')</code>, <code class="bg-gray-100 px-1 rounded">y = join(items, ',')</code></li>
+            <li>Texto (plantillas): <code class="bg-gray-100 px-1 rounded">Hola {{ upper(user_name) }}</code></li>
+            <li>JSON embebido en texto: escapa comillas — <code class="bg-gray-100 px-1 rounded">{"user":"{{ user_name }}"}</code></li>
+          </ul>
+        </div>
+
+        <div class="p-3 bg-white rounded border">
+          <h4 class="font-semibold mb-2">Ejemplos rápidos de IF (backend)</h4>
+          <p class="text-xs text-gray-600 mb-2">Sugerencia: usa nombres de variables sin {{ }}. También funcionan con {{ var }} si lo prefieres.</p>
+          <ul class="list-disc pl-6 space-y-2">
+            <li class="flex items-center gap-2">
+              <code class="bg-gray-100 px-1 rounded">isEmpty(my_var)</code>
+              <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="isEmpty(my_var)">Copiar</button>
+              <span class="text-xs text-gray-500">nulo/vacío</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <code class="bg-gray-100 px-1 rounded">!isEmpty(my_var)</code>
+              <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="!isEmpty(my_var)">Copiar</button>
+              <span class="text-xs text-gray-500">tiene contenido</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <code class="bg-gray-100 px-1 rounded">isDefined(my_var) &amp;&amp; !isEmpty(my_var)</code>
+              <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="isDefined(my_var) && !isEmpty(my_var)">Copiar</button>
+              <span class="text-xs text-gray-500">definido y no vacío</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <code class="bg-gray-100 px-1 rounded">my_var == null</code>
+              <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="my_var == null">Copiar</button>
+              <span class="text-xs text-gray-500">nulo/undefined</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <code class="bg-gray-100 px-1 rounded">my_var != null</code>
+              <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="my_var != null">Copiar</button>
+              <span class="text-xs text-gray-500">tiene algún valor</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <code class="bg-gray-100 px-1 rounded">len(items) &gt; 0</code>
+              <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="len(items) > 0">Copiar</button>
+              <span class="text-xs text-gray-500">lista no vacía</span>
+            </li>
+            <li class="flex items-center gap-2">
+              <code class="bg-gray-100 px-1 rounded">contains(name, 'ana')</code>
+              <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="contains(name, 'ana')">Copiar</button>
+            </li>
+            <li class="flex items-center gap-2">
+              <code class="bg-gray-100 px-1 rounded">startsWith(code, 'ES-')</code>
+              <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="startsWith(code, 'ES-')">Copiar</button>
+            </li>
+            <li class="flex items-center gap-2">
+              <code class="bg-gray-100 px-1 rounded">coalesce(alias, name, 'N/A') != 'N/A'</code>
+              <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="coalesce(alias, name, 'N/A') != 'N/A'">Copiar</button>
+              <span class="text-xs text-gray-500">alguno de alias/name presente</span>
+            </li>
+          </ul>
+        </div>
+
+        <div class="p-3 bg-white rounded border">
+          <h4 class="font-semibold mb-2">Tipos de nodo soportados (motor backend)</h4>
+          <ul class="list-disc pl-6 space-y-1">
+            <li><b>start</b>: declara variables iniciales</li>
+            <li><b>response</b>: muestra texto con {{ vars }}</li>
+            <li><b>input</b>: guarda entrada del usuario</li>
+            <li><b>choice</b>: opciones; o modo switch por casos</li>
+            <li><b>button</b> / <b>multi_button</b>: botones estáticos o dinámicos</li>
+            <li><b>assign_var</b>: asigna valores con funciones (len, split, join, toNumber, trim, upper/lower, contains, startsWith/endsWith, isEmpty, coalesce)</li>
+            <li><b>rest_call</b>: llamadas HTTP con mapeos</li>
+            <li><b>condition (if)</b>: evalúa expresión booleana</li>
+            <li><b>loop</b>: foreach / while con <code>item</code> e <code>index</code></li>
+            <li><b>set_goto</b>: redirige el siguiente salto por variable</li>
+            <li><b>flow_jump / flow_return</b>: cambia de flujo y retorna</li>
+            <li><b>end</b>: finaliza el flujo</li>
+            <li><b>debug</b>: log rápido, útil para diagnóstico</li>
+          </ul>
+        </div>
+
+        <div class="p-3 bg-gray-50 rounded border">
+          <div class="font-semibold mb-1">Insertar ejemplo en el canvas</div>
+          <p class="mb-2">Crea un flujo mínimo con variables, conteo, join y toNumber:</p>
+          <ol class="list-decimal pl-6 space-y-1 mb-3">
+            <li>Start → define variable <code>items</code> como lista</li>
+            <li>Assign: <code>items = split('a,b,c', ',')</code></li>
+            <li>Assign: <code>items_count = len(items)</code></li>
+            <li>Assign: <code>csv = join(items, ';')</code></li>
+            <li>Assign: <code>n = toNumber('42')</code></li>
+            <li>Response: <code>Tienes {{ items_count }} elementos; csv={{ csv }}; n={{ n }}</code></li>
+            <li>End: finaliza el flujo</li>
+          </ol>
+          <button id="btnInsertExample" class="px-3 py-2 bg-sky-600 text-white rounded text-sm">Insertar ejemplo</button>
+        </div>
+
+        <hr class="my-2"/>
+        <div>
+          <h4 class="text-base font-semibold">Ayuda del Simulador (resumen)</h4>
+          <div class="mt-2 space-y-3">
+            <div>
+              <h5 class="font-semibold text-sky-600">📝 Variables</h5>
+              <p>Interpolación en textos con <code class="bg-gray-100 px-1 rounded">{{variable}}</code>:</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">Hola {{user_name}}, tienes {{user_age}} años</pre>
+            </div>
+            <div>
+              <h5 class="font-semibold text-sky-600">🎨 Markdown</h5>
+              <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
+                <li><code>**negrita**</code>, <code>*cursiva*</code>, <code># Título</code>, listas y <code>`código`</code></li>
+              </ul>
+            </div>
+            <div>
+              <h5 class="font-semibold text-sky-600">📊 DataInfo</h5>
+              <p>Permite construir JSON con variables interpoladas:</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">{"user":"{{user_name}}","age":{{user_age}}}</pre>
+            </div>
+            <div>
+              <h5 class="font-semibold text-sky-600">💡 Consejos</h5>
+              <ul class="list-disc list-inside ml-4 mt-1 space-y-1">
+                <li>Las variables y Markdown se renderizan en el chat del simulador</li>
+                <li>Escapa comillas en JSON cuando sea necesario</li>
+              </ul>
+            </div>
+          </div>
+        </div>
+
+        <div>
+          <h4 class="text-base font-semibold">Ejemplos por tipo de elemento</h4>
+          <div class="mt-2">
+            <details class="mb-2"><summary class="font-semibold">Start</summary>
+              <p class="text-xs mt-1">Declara variables iniciales del flujo.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">variables: [
+  { "name": "items", "isList": true, "defaultValue": "[]" },
+  { "name": "user_name", "defaultValue": "" }
+]</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Response</summary>
+              <p class="text-xs mt-1">Muestra texto (array de strings). Soporta Markdown y {{ vars }}.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">i18n: { es: { text: [
+  "Hola {{ user_name }}", "Tienes {{ len(items) }} elementos"
+]}}</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Input</summary>
+              <p class="text-xs mt-1">Pide un valor y lo guarda en una variable.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">i18n: { es: { prompt: "Tu nombre" } },
+save_as: "user_name"</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Assign Variable</summary>
+              <p class="text-xs mt-1">Asigna valores (expresiones soportadas: len, split, join, toNumber, bool...).</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">assignments: [
+  { "target": "items", "value": "split('a,b,c', ',')" },
+  { "target": "items_count", "value": "len(items)" },
+  { "target": "csv", "value": "join(items, ';')" },
+  { "target": "n", "value": "toNumber('42')" },
+  { "target": "user.name", "value": "'Ana'" }
+]</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Condition</summary>
+              <p class="text-xs mt-1">Evalúa una expresión booleana y redirige por true/false.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">expr: "len(items) &gt; 0",
+true_target: { node_id: "res_ok" },
+false_target: { node_id: "res_vacio" }</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">ForEach</summary>
+              <p class="text-xs mt-1">Itera una lista y expone <code>item</code> y <code>index</code>.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">type: "foreach",
+source_list: "items",
+item_var: "item",
+index_var: "index",
+loop_body: { node_id: "resp_item" }</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Button/Choice</summary>
+              <p class="text-xs mt-1">Ofrece opciones; cada opción apunta a un siguiente nodo.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">options: [
+  { "label": "Sí", "target": { "node_id": "n_ok" } },
+  { "label": "No", "target": { "node_id": "n_ko" } }
+]</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">REST Call</summary>
+              <p class="text-xs mt-1">Realiza llamadas HTTP. Soporta {{variables}} en la URL.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">method: "GET",
+url: "https://api.example.com/user/{{ user_id }}",
+save_as: "resp"</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Set Goto</summary>
+              <p class="text-xs mt-1">Fija la variable de salto (goto) para redirigir el flujo.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">target: "nodo_destino"</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">Form</summary>
+              <p class="text-xs mt-1">Recolecta varios campos en una sola interacción.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">fields: [
+  { "name": "email", "label": "Email", "type": "text" },
+  { "name": "age", "label": "Edad", "type": "number" }
+]</pre>
+            </details>
+            <details class="mb-2"><summary class="font-semibold">End</summary>
+              <p class="text-xs mt-1">Finaliza el flujo. Buenas prácticas: todos los flujos deben terminar en un nodo <code>end</code>.</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">type: "end"</pre>
+            </details>
+          </div>
+        </div>
+      </div>
+    </div>
+  </dialog>
+</template>

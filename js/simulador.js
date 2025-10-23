@@ -104,6 +104,7 @@
     if (!state) state = { variables:{}, history:[], current: null, steps:0, selections:{button:{}, choice:{}} };
     if (!state.current) state.current = flow._start || flow.start_node || null;
     try{ log(`Conmutado a flujo: ${flow.name || flow.flow_id} (${flowId})`); }catch(_e){}
+    try { validateAndRenderFlowWarnings(flow); } catch(_e){}
     return true;
   }
 
@@ -131,6 +132,134 @@
     }
     // Devolver nodeId o start del flujo actual si falta
     return nodeId || (flow?._start || flow?.start_node || null);
+  }
+
+  // --- Validación: todos los caminos deben poder alcanzar un nodo end ---
+  function collectEdgesForNode(f, node){
+    const edges = [];
+    if (!node || !f) return edges;
+    const pushRef = (ref)=>{
+      if (!ref) return;
+      if (typeof ref === 'string') { edges.push(ref); return; }
+      if (typeof ref === 'object' && ref.node_id) edges.push(ref.node_id);
+    };
+    // next común
+    if (node.next) pushRef(node.next);
+    // condition
+    if (node.true_target) pushRef(node.true_target);
+    if (node.false_target) pushRef(node.false_target);
+    // choice/button/multi_button con options[].target
+    try{
+      const opts = node.options || (node.i18n ? Object.values(node.i18n).find(x=>Array.isArray(x.options))?.options : null);
+      if (Array.isArray(opts)){
+        for (const o of opts){ if (o && o.target) pushRef(o.target); }
+      }
+    }catch(_e){}
+    // loop: tratar como next normal + posible body
+    if (node.loop_body) pushRef(node.loop_body);
+    return edges.filter(Boolean);
+  }
+
+  function validateFlowEnds(f){
+    const result = { hasEnd: false, reachedEnd: false, dangling: [] };
+    if (!f || !f._nodes) return result;
+    const nodes = f._nodes;
+    const startId = f._start || f.start_node || null;
+    const visited = new Set();
+    const queue = [];
+    if (startId) queue.push(startId);
+    // detectar si hay al menos un end en el flujo
+    for (const id of Object.keys(nodes)){
+      const n = nodes[id]; if (n && n.type === 'end') { result.hasEnd = true; break; }
+    }
+    // BFS desde start
+    while(queue.length){
+      const id = queue.shift();
+      if (visited.has(id)) continue;
+      visited.add(id);
+      const n = nodes[id]; if (!n) continue;
+      if (n.type === 'end') { result.reachedEnd = true; }
+      const edges = collectEdgesForNode(f, n);
+      if (!edges.length && n.type !== 'end') {
+        result.dangling.push(id);
+      }
+      for (const to of edges){ if (to && !visited.has(to)) queue.push(to); }
+    }
+    return result;
+  }
+
+  function validateAndRenderFlowWarnings(f){
+    const w = document.getElementById('simulatorWarnings');
+    if (!w) return;
+    const res = validateFlowEnds(f);
+    const msgs = [];
+    if (!res.hasEnd) msgs.push('Este flujo no define ningún nodo end.');
+    if (!res.reachedEnd) msgs.push('Desde el nodo start no se alcanza ningún nodo end.');
+    if (res.dangling.length) msgs.push(`Nodos terminales sin end: ${res.dangling.join(', ')}`);
+    if (msgs.length){
+      w.classList.remove('hidden');
+      const actions = res.dangling.length ? `<div class="mt-2"><button type="button" class="px-2 py-1 text-xs bg-white border rounded btnHighlightDangling">Resaltar en canvas</button></div>` : '';
+      w.innerHTML = `<div class="font-semibold mb-1">Advertencias de validación</div><ul class="list-disc ml-4">${msgs.map(m=>`<li>${m}</li>`).join('')}</ul>${actions}`;
+      try{ console.warn('[Simulador][Validación]', msgs.join(' | ')); }catch(_e){}
+      // Aplicar resaltado en canvas
+      try { highlightDanglingOnCanvas(res.dangling); } catch(_e){}
+      // Vincular acción para centrar en el primer nodo colgante
+      try {
+        const btn = w.querySelector('.btnHighlightDangling');
+        if (btn) {
+          btn.addEventListener('click', () => {
+            try { highlightDanglingOnCanvas(res.dangling, { flash: true }); } catch(_e){}
+            const first = res.dangling[0];
+            if (first && window.App) {
+              try {
+                const nodeObj = window.App.state && window.App.state.nodes ? window.App.state.nodes[first] : null;
+                if (nodeObj && typeof window.App.ensureNodeVisible === 'function') window.App.ensureNodeVisible(nodeObj, 120);
+                // En caso de que no exista el objeto, intentar scroll al elemento directamente
+                else {
+                  const el = document.getElementById('node_' + first);
+                  if (el) el.scrollIntoView({ behavior: 'smooth', block: 'center', inline: 'center' });
+                }
+              } catch(_e2){}
+            }
+          });
+        }
+      } catch(_e){}
+    } else {
+      w.classList.add('hidden');
+      w.textContent = '';
+      try { clearDanglingHighlights(); } catch(_e){}
+    }
+  }
+
+  // --- Visual highlighting helpers for dangling nodes on the editor canvas ---
+  function clearDanglingHighlights(){
+    try {
+      const root = document.getElementById('canvasInner') || document;
+      root.querySelectorAll('.node.dangling').forEach(el => el.classList.remove('dangling'));
+    } catch(_e){}
+  }
+
+  function highlightDanglingOnCanvas(ids, opts){
+    const options = opts || {};
+    const list = Array.isArray(ids) ? ids : [];
+    try {
+      clearDanglingHighlights();
+      if (!list.length) return;
+      for (const id of list){
+        try {
+          const el = document.getElementById('node_' + id);
+          if (el) {
+            el.classList.add('dangling');
+            if (options.flash) {
+              el.animate(
+                [ { boxShadow: '0 0 0 0 rgba(239,68,68,0.0)' }, { boxShadow: '0 0 0 6px rgba(239,68,68,0.35)' }, { boxShadow: '0 0 0 0 rgba(239,68,68,0.0)' } ],
+                { duration: 800, iterations: 1, easing: 'ease-out' }
+              );
+            }
+          }
+        } catch(_e){}
+      }
+    } catch(_e){}
   }
 
   // Aplica los defaults declarados en el nodo start del flujo indicado según la política

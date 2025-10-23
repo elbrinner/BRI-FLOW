@@ -31,6 +31,8 @@ Cada tipo de nodo, sus campos y comportamiento están descritos en:
 
 Encontrarás: `start`, `response`, `input`, `assign_var`, `choice (prompt/switch)`, `button`, `multi_button`, `form`, `rest_call`, `condition`, `loop/foreach/while`, `set_goto`, `flow_jump`, `file_upload`, `file_download`, `json_export`, `hero_card`, `carousel`, `hidden_response`, `debug`, `end`.
 
+Nota importante: todos los flujos deben terminar explícitamente con un nodo `end`. Aunque algunos recorridos puedan parecer “finales” (p. ej., sin `next`), normaliza tu diseño para que cada camino concluya en `end`; esto facilita validaciones, simulación y exportaciones.
+
 ## Cómo ejecutar en local
 
 Requisitos mínimos:
