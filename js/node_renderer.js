@@ -20,6 +20,26 @@
     end: { color: '#ff6b6b', bg: 'linear-gradient(90deg,#fff6f6,#fff)', icon: '🏁', label: 'Fin' }
   };
 
+  // Helpers locales para formatear valores mostrados en nodos
+  function escHtml(s){
+    return String(s)
+      .replaceAll('&','&amp;')
+      .replaceAll('<','&lt;')
+      .replaceAll('>','&gt;')
+      .replaceAll('"','&quot;')
+      .replaceAll("'",'&#39;');
+  }
+  function toDisplayAndTitle(raw){
+    let s = '';
+    if (raw !== null && raw !== undefined) {
+      if (typeof raw === 'string') { s = raw; }
+  else if (typeof raw === 'object') { s = JSON.stringify(raw); }
+      else { s = String(raw); }
+    }
+    if (s.length > 5) { return { display: 'ℹ️', title: s }; }
+    return { display: s, title: '' };
+  }
+
   function renderNode(state, node, canvasInner, zoom, addEndpoints, selectNodeFn) {
     // if node element exists, remove to re-render
     const existing = document.getElementById('node_'+node.id);
@@ -101,7 +121,12 @@
       const declared = Array.isArray(node.variables) ? node.variables.filter(v => v && v.name) : [];
       if (declared.length) {
         html = `<div class="variables-preview">` + declared.map(v => {
-          return `<div class="var-item"><strong>${v.name}</strong>: ${v.defaultValue || ''}${v.isList ? ' <small>[lista]</small>' : ''}</div>`;
+          const { display, title } = toDisplayAndTitle(v.defaultValue);
+          const nameHtml = escHtml(v.name);
+          const valueHtml = escHtml(display);
+          const titleAttr = title ? ` title="${escHtml(title)}" aria-label="Valor oculto"` : '';
+          const listBadge = v.isList ? ' <small>[lista]</small>' : '';
+          return `<div class="var-item"${titleAttr}><strong>${nameHtml}</strong>: ${valueHtml}${listBadge}</div>`;
         }).join('') + `</div>` + html;
       }
       // summary of other global variables (not declared in start) as tags; include value when available
@@ -117,7 +142,10 @@
               const info = declMap[name];
               const val = info ? (info.defaultValue || '') : '';
               const isList = info ? !!info.isList : false;
-              return `<span class="tag ${isList? 'tag-list':''}" title="${name}${val?': '+val:''}">${name}${val?': '+val:''}</span>`;
+              const { display, title } = toDisplayAndTitle(val);
+              const label = display ? `${name}: ${display}` : `${name}`;
+              const titleAttr = title ? `${name}: ${title}` : `${name}`;
+              return `<span class="tag ${isList? 'tag-list':''}" title="${escHtml(titleAttr)}">${escHtml(label)}</span>`;
             }).join('');
             html = `<div class="tags-container" title="Variables globales">${tags}</div>` + html;
           }
