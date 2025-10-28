@@ -557,6 +557,31 @@ body.compact-ui .assign-actions .explorer-btn,
 body.compact-ui .assign-actions .remove-assignment { padding: 2px 6px !important; font-size: 12px !important; }
 body.compact-ui .add-assignment { padding-top: 4px; padding-bottom: 4px; }
 
+/* ---- assign_var layout improvements (only layout/visual, no logic) ---- */
+.assignment-row{ display:grid; grid-template-columns:minmax(140px,0.9fr) minmax(140px,0.9fr) minmax(160px,1fr) min-content; gap:6px; align-items:center; }
+.assignment-row .assign-target, .assignment-row .assign-path, .assignment-row .assign-value{ min-width:0; padding:4px 6px; font-size:12px; }
+.assignment-row .assign-actions{ display:flex; align-items:center; justify-content:flex-end; gap:6px; }
+.assignment-row .field-col{ display:flex; flex-direction:column; gap:4px; }
+.assignment-row .field-label{ font-size:10px; color:#6b7280; line-height:1; }
+.assignment-row .explorer-btn{ display:inline-flex; align-items:center; justify-content:center; gap:4px; background:#ffffff; border:1px solid #c7ddff; color:#174ea6; border-radius:6px; padding:4px 6px; line-height:1; cursor:pointer; box-shadow:0 1px 0 rgba(16,42,67,0.02); }
+.assignment-row .explorer-btn .explorer-icon{ font-size:14px; line-height:1; }
+.assignment-row .explorer-btn:hover{ background:#eef6ff; }
+.assignment-row .explorer-btn:disabled{ opacity:0.5; cursor:not-allowed; background:#f9fafb; border-color:#e5e7eb; color:#9ca3af; }
+.assignment-row .explorer-btn.icon-only{ width:28px; height:28px; padding:0; display:inline-flex; align-items:center; justify-content:center; }
+.assignment-row .remove-assignment{ background:#fff; border:1px solid #e5e7eb; border-radius:6px; padding:4px 8px; font-size:12px; cursor:pointer; }
+
+/* Responsive wrapping for narrow panels */
+/* En pantallas grandes recuperamos 4 columnas completas */
+@media (min-width: 1100px){
+  .assignment-row{ grid-template-columns:minmax(180px,1fr) minmax(160px,1fr) minmax(160px,1fr) auto; }
+  .assignment-row .assign-value{ grid-column:auto; }
+}
+@media (max-width: 560px){
+  .assignment-row{ grid-template-columns: 1fr; }
+  .assignment-row .assign-path, .assignment-row .assign-value{ grid-column: 1 / -1; }
+  .assignment-row .assign-actions{ justify-content:flex-start; }
+}
+
 /* tag variant for variables that are lists */
 .tag-list {
   background: #fff4e6; /* warm yellow */

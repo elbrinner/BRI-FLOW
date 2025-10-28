@@ -100,9 +100,9 @@
     // helpers para saber si una variable es "objeto" (según defaultValue en Start) — busca en todos los flujos
 
     function renderRow(a){
-      const row = el('div',{class:'assignment-row grid grid-cols-[minmax(160px,1fr)_minmax(160px,1fr)_minmax(160px,1fr)_auto] gap-1 items-center'});
+      const row = el('div',{class:'assignment-row'});
       // select root var
-      const selTarget = el('select',{class:'assign-target border rounded px-2 py-1 text-sm w-full min-w-0'});
+      const selTarget = el('select',{class:'assign-target border rounded px-2 py-1 text-sm w-full min-w-0', 'aria-label':'Variable'});
       selTarget.appendChild(el('option',{value:'',text:'-- seleccionar --'}));
       const curFlowId = globalThis.AppProject?.active_flow_id || globalThis.App?.state?.flow_id || '';
       for (const ent of getAllVarEntries()){
@@ -112,31 +112,52 @@
         selTarget.appendChild(opt);
       }
       // path
-      const pathInp = el('input',{type:'text',class:'assign-path border rounded px-2 py-1 text-sm w-full min-w-0',placeholder:'propiedad (ej: persona.nombre)'});
+      const pathInp = el('input',{type:'text',class:'assign-path border rounded px-2 py-1 text-sm w-full min-w-0',placeholder:'Propiedad (ej: persona.nombre)','aria-label':'Propiedad (objeto)'});
       // init select+path from a.target
   if (a?.target?.includes('.')){ const parts=a.target.split('.'); selTarget.value = parts[0]; pathInp.value = parts.slice(1).join('.'); }
   else if (a?.target) { selTarget.value = a.target; }
   // value
-  const valueAttrs = { type:'text', class:'assign-value border rounded px-2 py-1 text-sm w-full min-w-0', placeholder:'ej: "texto" | 123 | context.varX | {{expresion}}', value: a.value || '' };
+  const valueAttrs = { type:'text', class:'assign-value border rounded px-2 py-1 text-sm w-full min-w-0', placeholder:'Valor ("texto" | 123 | context.varX | {{expresion}})', value: a.value || '', 'aria-label':'Valor' };
   const valueInp = el('input', valueAttrs);
       // actions (explorer + remove) en una sola celda para evitar saltos de fila
       const actions = el('div',{class:'assign-actions flex items-center gap-1 justify-end'});
-      const explorerBtn = el('button',{type:'button',class:'explorer-btn px-2 py-1 border rounded text-sm', text:'Explorar'});
+      const explorerBtn = el('button',{type:'button',class:'explorer-btn icon-only px-1.5 py-1 border rounded text-xs', title:'Explorar', 'aria-label':'Explorar'});
+      // solo icono para ahorrar espacio
+      try {
+        const icon = document.createElement('span'); icon.className = 'explorer-icon'; icon.textContent = '🔎';
+        explorerBtn.appendChild(icon);
+      } catch(error_) { console.warn('[assign_var] No se pudo componer el botón Explorar:', error_); explorerBtn.textContent = '🔎'; }
       const removeBtn = el('button',{type:'button',class:'remove-assignment px-2 py-1 border rounded text-sm', title:'Eliminar asignación', text:'−'});
 
-      row.appendChild(selTarget);
-      row.appendChild(pathInp);
-      row.appendChild(valueInp);
+      // columnas con etiqueta visible
+      const colTarget = el('div',{class:'field-col'},[
+        el('span',{class:'field-label', text:'Variable'}),
+        selTarget
+      ]);
+      const colPath = el('div',{class:'field-col'},[
+        el('span',{class:'field-label', text:'Propiedad (objeto)'}),
+        pathInp
+      ]);
+      const colValue = el('div',{class:'field-col'},[
+        el('span',{class:'field-label', text:'Valor'}),
+        valueInp
+      ]);
+
+      row.appendChild(colTarget);
+      row.appendChild(colPath);
+      row.appendChild(colValue);
       actions.appendChild(explorerBtn);
       actions.appendChild(removeBtn);
       row.appendChild(actions);
 
       // si la variable seleccionada no es objeto, ocultar path + explorer
       function updateVisibility(){
-        const showPath = !!selTarget.value && isObjectVar(selTarget.value);
-        pathInp.classList.toggle('hidden', !showPath);
-        explorerBtn.classList.toggle('hidden', !showPath);
-        if (!showPath) pathInp.value = '';
+        const isObj = !!selTarget.value && isObjectVar(selTarget.value);
+        // Mantener visibles siempre, pero deshabilitar si no aplica
+        pathInp.disabled = !isObj;
+        explorerBtn.disabled = !isObj;
+        pathInp.placeholder = isObj ? 'Propiedad (ej: persona.nombre)' : '— no aplica —';
+        if (!isObj) pathInp.value = '';
       }
       updateVisibility();
       selTarget.addEventListener('change', updateVisibility);
@@ -205,16 +226,19 @@
       if (ev.target.classList.contains('assign-target')) { persist(); validator.run(); }
     });
     assignmentsContainer.addEventListener('click', async (ev)=>{
-      if (ev.target.classList.contains('add-assignment')){
+      const addBtnEl = ev.target.closest('.add-assignment');
+      const removeBtnEl = ev.target.closest('.remove-assignment');
+      const explorerBtnEl = ev.target.closest('.explorer-btn');
+      if (addBtnEl){
         node.assignments.push({ target:'', value:'' });
         renderAssignments(); persist(); validator.run();
-      } else if (ev.target.classList.contains('remove-assignment')){
+      } else if (removeBtnEl){
         const rows = Array.from(assignmentsContainer.querySelectorAll('.assignment-row'));
-        const idx = rows.indexOf(ev.target.closest('.assignment-row'));
+        const idx = rows.indexOf(removeBtnEl.closest('.assignment-row'));
         if (idx >= 0) node.assignments.splice(idx,1);
         renderAssignments(); persist(); validator.run();
-      } else if (ev.target.classList.contains('explorer-btn')){
-        const row = ev.target.closest('.assignment-row');
+      } else if (explorerBtnEl){
+        const row = explorerBtnEl.closest('.assignment-row');
         const sel = row.querySelector('.assign-target');
         const pathInp = row.querySelector('.assign-path');
         const root = sel?.value;
@@ -223,7 +247,7 @@
           const picker = globalThis.VarExplorer.open(root);
           const chosen = await picker.waitForSelection();
           if(chosen?.path){ pathInp.value = chosen.path; persist(); validator.run(); }
-        }catch(e){ console.warn('Explorer open failed', e); alert('No se pudo abrir el explorador'); }
+        }catch(error_){ console.warn('Explorer open failed', error_); alert('No se pudo abrir el explorador'); }
       }
     });
 
