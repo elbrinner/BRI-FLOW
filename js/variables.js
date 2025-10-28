@@ -38,8 +38,17 @@
     val.className = 'font-mono';
     const raw = (v && Object.hasOwn(v, 'defaultValue')) ? v.defaultValue : '';
     const { display, title } = toDisplayAndTitle(raw);
-    val.textContent = display;
-    if (title) { val.title = title; val.setAttribute('aria-label', 'Valor oculto'); }
+    if (title) {
+      // Reemplazar por badge estilizado con tooltip elegante (similar a node-doc-badge)
+      val.textContent = '';
+      const wrap = document.createElement('span'); wrap.className = 'inline-tip-wrap';
+      const badge = document.createElement('span'); badge.className = 'info-tip'; badge.setAttribute('aria-label','Valor oculto'); badge.setAttribute('tabindex','0'); badge.textContent = 'i';
+      const tip = document.createElement('div'); tip.className = 'inline-tip'; tip.textContent = title;
+      wrap.appendChild(badge); wrap.appendChild(tip);
+      val.appendChild(wrap);
+    } else {
+      val.textContent = display;
+    }
     const copyBtn = document.createElement('button');
     copyBtn.type = 'button';
     copyBtn.title = 'Copiar variable';

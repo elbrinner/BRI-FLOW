@@ -123,10 +123,14 @@
         html = `<div class="variables-preview">` + declared.map(v => {
           const { display, title } = toDisplayAndTitle(v.defaultValue);
           const nameHtml = escHtml(v.name);
-          const valueHtml = escHtml(display);
-          const titleAttr = title ? ` title="${escHtml(title)}" aria-label="Valor oculto"` : '';
           const listBadge = v.isList ? ' <small>[lista]</small>' : '';
-          return `<div class="var-item"${titleAttr}><strong>${nameHtml}</strong>: ${valueHtml}${listBadge}</div>`;
+          if (title) {
+            const tipHtml = `<span class="inline-tip-wrap"><span class="info-tip" aria-label="Valor oculto" tabindex="0">i</span><div class="inline-tip">${escHtml(title)}</div></span>`;
+            return `<div class="var-item"><strong>${nameHtml}</strong>: ${tipHtml}${listBadge}</div>`;
+          } else {
+            const valueHtml = escHtml(display);
+            return `<div class="var-item"><strong>${nameHtml}</strong>: ${valueHtml}${listBadge}</div>`;
+          }
         }).join('') + `</div>` + html;
       }
       // summary of other global variables (not declared in start) as tags; include value when available
@@ -143,9 +147,13 @@
               const val = info ? (info.defaultValue || '') : '';
               const isList = info ? !!info.isList : false;
               const { display, title } = toDisplayAndTitle(val);
-              const label = display ? `${name}: ${display}` : `${name}`;
-              const titleAttr = title ? `${name}: ${title}` : `${name}`;
-              return `<span class="tag ${isList? 'tag-list':''}" title="${escHtml(titleAttr)}">${escHtml(label)}</span>`;
+              if (title) {
+                const tipHtml = `<span class="inline-tip-wrap"><span class="info-tip" aria-label="Valor oculto" tabindex="0">i</span><div class="inline-tip">${escHtml(title)}</div></span>`;
+                return `<span class="tag ${isList? 'tag-list':''}">${escHtml(name)} ${tipHtml}</span>`;
+              } else {
+                const label = display ? `${name}: ${display}` : `${name}`;
+                return `<span class="tag ${isList? 'tag-list':''}" title="${escHtml(label)}">${escHtml(label)}</span>`;
+              }
             }).join('');
             html = `<div class="tags-container" title="Variables globales">${tags}</div>` + html;
           }
