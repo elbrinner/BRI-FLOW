@@ -1,0 +1,39 @@
+{
+  "flow_id": "demo_agent_normal",
+  "meta": {
+    "flow_id": "demo_agent_normal",
+    "name": "Demo Agente Normal",
+    "locales": ["es"],
+    "start_node": "start1"
+  },
+  "nodes": {
+    "start1": {
+      "id": "start1",
+      "type": "start",
+      "next": { "node_id": "agent1" }
+    },
+    "agent1": {
+      "id": "agent1",
+      "type": "agent_call",
+      "props": {
+        "agent_profile": "normal",
+        "message": "Hola, ¿puedes explicarme el proceso en 3 pasos?",
+        "stream": true,
+        "save_as": "r1",
+        "model": {
+          "provider": "azure-openai",
+          "deployment": "gpt-4o-mini",
+          "temperature": 0.2,
+          "max_tokens": 600
+        },
+        "system_prompt": "Responde de forma clara y concisa en viñetas."
+      },
+      "next": { "node_id": "resp1" }
+    },
+    "resp1": {
+      "id": "resp1",
+      "type": "response",
+      "text": "El agente respondió:\n\n${r1.text}"
+    }
+  }
+}

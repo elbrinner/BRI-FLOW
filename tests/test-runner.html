@@ -1,0 +1,52 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bri Flow — Test Runner</title>
+  <link rel="stylesheet" href="../css/style.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white">
+  <header class="px-4 py-3 border-b bg-sky-50">
+    <div class="flex items-center justify-between">
+      <h1 class="text-xl font-bold text-sky-700">Bri Flow — Test Runner</h1>
+      <nav class="text-sm">
+        <a class="text-sky-700 underline" href="../index.html">← Volver al editor</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="p-4 max-w-5xl mx-auto">
+    <section class="mb-3">
+      <p class="text-gray-700 text-sm">Página dedicada para ejecutar y validar pruebas del simulador (paridad y casos avanzados). No se cargan pruebas en el editor principal.</p>
+    </section>
+
+    <section class="mb-4">
+      <div class="flex items-center gap-2 flex-wrap">
+        <button id="btnRunListFnTests" class="px-3 py-1 bg-white border rounded text-sm" title="Probar funciones de lista">Tests listas</button>
+        <button id="btnRunExprParityTests" class="px-3 py-1 bg-white border rounded text-sm" title="Probar paridad de expresiones">Tests expresiones</button>
+        <button id="btnRunExprAdvancedTests" class="px-3 py-1 bg-white border rounded text-sm" title="Pruebas avanzadas (nesting y bordes)">Tests avanzados</button>
+      </div>
+    </section>
+
+    <section class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+      <div class="border rounded p-3">
+        <h2 class="font-semibold mb-2">Resultados</h2>
+        <div id="simulatorChat" class="h-80 overflow-auto border rounded p-2 bg-gray-50 text-xs"></div>
+      </div>
+      <div class="border rounded p-3">
+        <h2 class="font-semibold mb-2">Consola</h2>
+        <p class="text-xs text-gray-600">Abre la consola del navegador para más detalle (info/errores por cada caso).</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Cargar ExpressionParser (necesario) -->
+  <script src="../js/expression_parser.js"></script>
+  <!-- Cargar suites de pruebas -->
+  <script src="./simulator_expr_list_tests.js"></script>
+  <script src="./simulator_expr_parity_tests.js"></script>
+  <script src="./simulator_expr_advanced_tests.js"></script>
+</body>
+</html>

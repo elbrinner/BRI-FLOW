@@ -4,6 +4,9 @@ Este documento describe cada tipo de nodo disponible en BRI-FLOW, sus propiedade
 
 Nota: el JSON generado por el editor requiere un backend/intérprete externo (no incluido en este repo) para su ejecución real.
 
+## Índice rápido
+- Ir directo a: [Expresiones y funciones disponibles](#expresiones-y-funciones-disponibles)
+
 ## Inicio (start)
 - Propósito: Define variables globales iniciales y los idiomas (locales) del flujo. Solo puede existir un `start` por flujo.
 - Props clave:
@@ -134,3 +137,57 @@ Nota: el JSON generado por el editor requiere un backend/intérprete externo (no
 ### Variables
 - Nodos que suelen escribir variables: `input.save_as`, `rest_call.save_as` y `mappings`, `file_upload.save_as`, `button.save_as`, `assign_var.assignments[].target`/`value`.
 - El `start` inicializa `window.App.runtimeContext.variables` con los `defaultValue` (se intenta parsear JSON básico y coerción numérica/booleana).
+
+---
+
+## Expresiones y funciones disponibles
+
+Las expresiones se usan en múltiples nodos (p. ej., `assign_var.value`, `choice.switch.cases[].when`, `loop.cond`, `provider.*_expr`). El editor y el backend comparten semántica para las funciones descritas aquí. Puedes combinar funciones (anidar) libremente.
+
+Notas generales
+- Tipos de retorno: se indica entre paréntesis.
+- Literales soportados: strings `'texto'` o `"texto"`, números, `true|false`, `null`, `undefined`.
+- Rutas a variables: `user.name`, `resp.data.title`.
+- Anidación: se permiten llamadas anidadas como `join(split('a|b','|'), ', ')` o `addItem(split('a|b','|'), 'c')`.
+
+Funciones de string/lista y utilidades
+- `len(x) -> number`: longitud de string o de lista; `len('hola') == 4`.
+- `split(s, sep) -> list`: divide `s` por `sep`; `split('a,b,c', ',') == ['a','b','c']`.
+- `join(list, sep) -> string`: une elementos con `sep`; `join(['x','y','z'], ', ') == 'x, y, z'`.
+- `toNumber(x) -> number`: intenta convertir a número; `toNumber('42') == 42`.
+- `trim(s) -> string`: quita espacios; `trim(' hola ') == 'hola'`.
+- `upper(s) -> string`, `lower(s) -> string`.
+- `contains(hay, needle) -> boolean`:
+  - Si `hay` es lista/colección, busca por igualdad laxa el elemento `needle` (números vs strings se consideran iguales si su valor coincide). Ej.: `contains(split('a,b', ','), 'a') == true`.
+  - Si `hay` es string, verifica substring. Ej.: `contains('banana','ana') == true`.
+- `startsWith(s, pref) -> boolean`, `endsWith(s, suf) -> boolean`.
+- `isEmpty(x) -> boolean`: true si `x` es null/undefined, string vacío o lista vacía. Nota: `isEmpty(split('', ',')) == false` (split devuelve `['']`).
+- `coalesce(a, b, c, ...) -> any`: devuelve el primer argumento no vacío (no null/undefined y no string vacío). Ej.: `coalesce('', null, 'x') == 'x'`.
+
+Funciones de chequeo de null/undefined
+- `isNull(x) -> boolean`: true si `x` es null o undefined.
+- `isNotNull(x) -> boolean`: negación de `isNull`.
+- `isDefined(x) -> boolean`: true si `x` está definido y no es null.
+- `isUndefined(x) -> boolean`: true si `x` es undefined o null.
+
+Funciones para listas (no mutan la fuente; retornan nueva lista)
+- `addItem(list, value[, index]) -> list`:
+  - Inserta `value` al final si `index` está ausente o no es numérico.
+  - Si `index` está fuera de rango, se ajusta a `[0..len]` (clamp).
+  - Ej.: `addItem(['a','b'], 'X', 1) == ['a','X','b']`.
+- `removeItem(list, value) -> list`:
+  - Remueve la primera coincidencia por igualdad laxa (número 2 y string '2' equivalen).
+  - Ej.: `removeItem([1,'2',3], 2) == [1,3]`.
+- `removeAt(list, index) -> list`:
+  - Remueve el elemento en `index` si está en rango; de lo contrario no hace nada.
+  - Ej.: `removeAt(['a','b','c'], 0) == ['b','c']`.
+
+Ejemplos de composición
+- `join(split('x|y|z','|'), ', ') == 'x, y, z'`.
+- `coalesce(trim(user.nickname), user.name, 'invitado') == 'bru'` (si `user.nickname` es `' bru '`).
+- `join(addItem(split('a|b','|'), 'c'), ' - ') == 'a - b - c'`.
+
+Validación rápida de expresiones
+- Usa la página de pruebas dedicada: `tests/test-runner.html`.
+  - “Tests expresiones”: cubre todas las funciones documentadas y composiciones comunes.
+  - “Tests avanzados”: casos de anidación (join/split/addItem), índices fuera de rango, igualdad laxa, etc.

@@ -42,8 +42,9 @@
   function tokenize(input) {
     const tokens = [];
     let i = 0;
-    const isIdStart = (c) => /[a-zA-Z_]/.test(c);
-    const isId = (c) => /[a-zA-Z0-9_]/.test(c);
+  const isIdStart = (c) => /[a-zA-Z_]/.test(c);
+  // Permitir rutas con punto (user.nickname)
+  const isId = (c) => /[a-zA-Z0-9_\.]/.test(c);
     while (i < input.length) {
       const ch = input[i];
       if (ch === ' ' || ch === '\t' || ch === '\n' || ch === '\r') { i++; continue; }
@@ -240,6 +241,10 @@
       startsWith: (s, pref) => s == null ? false : String(s).startsWith(String(pref)),
       endsWith: (s, suf) => s == null ? false : String(s).endsWith(String(suf)),
       isEmpty: (v) => (v == null) || (Array.isArray(v) && v.length === 0) || (typeof v === 'string' && v.trim() === ''),
+      isNull: (v) => v === null || v === undefined,
+      isNotNull: (v) => !(v === null || v === undefined),
+      isDefined: (v) => !(v === undefined || v === null),
+      isUndefined: (v) => (v === undefined || v === null),
       coalesce: (...args) => {
         for (const a of args) if (a !== null && a !== undefined && a !== '') return a; return null;
       },

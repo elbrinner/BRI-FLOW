@@ -76,6 +76,18 @@ Notas útiles
 - Persistencia: el proyecto/estado del editor se guarda en el almacenamiento local del navegador (localStorage). Si quieres “resetear” el estado, limpia el almacenamiento del sitio desde las herramientas de desarrollador del navegador.
 - Llamadas externas: nodos como `rest_call` pueden necesitar un backend accesible y con CORS habilitado para pruebas reales. En ausencia de eso, utilízalos solo como referencia estructural durante el diseño.
 
+## Pruebas del simulador (paridad y avanzadas)
+
+Para ejecutar las pruebas del simulador (paridad de funciones y casos avanzados) usa la página dedicada del runner, no el `index.html` principal:
+
+- Abre: `tests/test-runner.html`
+- Allí encontrarás botones para:
+  - “Tests listas” (addItem, removeItem, removeAt)
+  - “Tests expresiones” (todas las funciones documentadas y composiciones)
+  - “Tests avanzados” (nesting de join/split/addItem, coalesce con join vacío, índices fuera de rango, igualdad laxa, etc.)
+
+Los resultados se muestran en el panel de la página y en la consola del navegador.
+
 ## Contribuciones
 ¡Se agradecen issues y PRs! Al contribuir, aceptas que tus aportes se licencian bajo los mismos términos indicados en la licencia del proyecto para su inclusión.
 
