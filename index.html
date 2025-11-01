@@ -28,6 +28,7 @@
           <button id="togglePaletteBtn" title="Mostrar / Ocultar paleta" class="px-3 py-1 bg-white border rounded text-sm">
             <span class="inline-flex items-center gap-2">
               <span aria-hidden="true">🛠️</span>
+            <button id="btnRunListFnTests" class="px-3 py-1 bg-white border rounded text-sm" title="Probar funciones de lista">Tests listas</button>
               <span>Nodos</span>
             </span>
           </button>
@@ -129,6 +130,10 @@
   <div class="draggable" draggable="true" data-type="condition">❓ Condition (If)</div>
   <div class="draggable" draggable="true" data-type="set_goto">🔙 Set Goto</div>
   <div class="draggable" draggable="true" data-type="end" title="Nodo fin del flujo">🏁 End</div>
+  <hr style="margin: 12px 0; border-color: #e5e7eb;" />
+  <div class="draggable" draggable="true" data-type="agent_call" title="Llamada a agente (RAG o normal)">🤖 Agent Call</div>
+  <div class="draggable" draggable="true" data-type="use_profile" title="Establecer perfil de credenciales">🔐 Use Profile</div>
+  <div class="draggable" draggable="true" data-type="credential_profile" title="Perfil de credenciales (simulador only)">🔑 Credential Profile</div>
   
   
     </aside>
@@ -224,6 +229,9 @@
   <script src="js/renderers/file_download.js"></script>
   <script src="js/renderers/end.js"></script>
   <script src="js/renderers/hidden_response.js"></script>
+  <script src="js/renderer_agent_call.js"></script>
+  <script src="js/renderer_use_profile.js"></script>
+  <script src="js/renderer_credential_profile.js"></script>
   <script src="js/form_renderers.js"></script>
   <script src="js/connections.js"></script>
   <script src="js/variables.js"></script>
@@ -246,6 +254,7 @@
   <script src="js/flow_runner.js"></script>
   <script src="js/runtime_demo.js"></script>
   <script src="js/simulador.js"></script>
+  <script src="js/simulator_expr_list_tests.js"></script>
   <script src="js/renderer_usage_report.js"></script>
   <script src="js/template_selftest.js"></script>
   <script>

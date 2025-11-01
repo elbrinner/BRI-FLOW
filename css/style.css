@@ -435,6 +435,9 @@ section.panel.panel-carousel { border-left:4px solid #7c3aed; }
 section.panel.panel-form { border-left:4px solid #0d9488; }
 section.panel.panel-file-upload { border-left:4px solid #db2777; }
 section.panel.panel-json-export { border-left:4px solid #15803d; }
+section.panel.panel-agent-call { border-left:4px solid #6366f1; }
+section.panel.panel-use-profile { border-left:4px solid #10b981; }
+section.panel.panel-credential-profile { border-left:4px solid #f59e0b; }
 section.panel.panel-file-download { border-left:4px solid #2563eb; }
 
 /* Slot base para que el contenido interno respete spacing uniforme */

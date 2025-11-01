@@ -886,6 +886,86 @@ const FormBuilder = (() => {
     return { variables, locales };
   }
 
+  function readAgentCall(container) {
+    const agent_profile = container.querySelector('#agent_profile')?.value || '';
+    const message = container.querySelector('#agent_message')?.value || '';
+    const stream = !!container.querySelector('#agent_stream')?.checked;
+    const save_as = container.querySelector('#agent_save_as')?.value || '';
+    const toolingRaw = container.querySelector('#agent_tooling')?.value || '';
+    const tooling = toolingRaw.split('\n').map(s => s.trim()).filter(Boolean);
+    const tools = safeParse(container.querySelector('#agent_tools_advanced')?.value || '[]', []);
+    const model = safeParse(container.querySelector('#agent_model')?.value || '{}', {});
+    const system_prompt = container.querySelector('#agent_system_prompt')?.value || '';
+    const search = safeParse(container.querySelector('#agent_search')?.value || '{}', {});
+    const mode = container.querySelector('#agent_mode')?.value || '';
+    const participantsRaw = container.querySelector('#agent_participants')?.value || '';
+    const participants = participantsRaw.split('\n').map(s => s.trim()).filter(Boolean);
+    // runtime block (optional)
+    const timeout_ms_raw = (container.querySelector('#agent_timeout_ms')?.value || '').trim();
+    const max_steps_raw = (container.querySelector('#agent_max_internal_steps')?.value || '').trim();
+    const retry_raw = (container.querySelector('#agent_retry_count')?.value || '').trim();
+    const runtime = {};
+    if (timeout_ms_raw !== '') runtime.timeout_ms = Number(timeout_ms_raw);
+    if (max_steps_raw !== '') runtime.max_internal_steps = Number(max_steps_raw);
+    if (retry_raw !== '') runtime.retry_count = Number(retry_raw);
+    const hasRuntime = Object.keys(runtime).length > 0;
+    // Construir salida condicional según el perfil
+  const base = { agent_profile, message, save_as };
+    function withCommonLLM(obj){
+      obj.model = model;
+      if (system_prompt) obj.system_prompt = system_prompt;
+      if (stream) obj.stream = true; else obj.stream = false; // mantener explícito para UI
+      if (tooling && tooling.length) obj.tooling = tooling; else obj.tooling = [];
+      if (Array.isArray(tools) && tools.length) obj.tools = tools;
+      if (hasRuntime) obj.runtime = runtime;
+      return obj;
+    }
+    switch((agent_profile || 'normal')){
+      case 'rag': {
+        const out = withCommonLLM({ ...base });
+        // incluir bloque de búsqueda solo en RAG
+        out.search = search;
+        return out;
+      }
+      case 'retrieval': {
+        // Solo recuperación: no incluir modelo/system_prompt/stream/tooling
+        const out = { ...base };
+        out.search = search;
+        if (Array.isArray(tools) && tools.length) out.tools = tools; // permitir tools que no sean generativas
+        if (hasRuntime) out.runtime = runtime;
+        return out;
+      }
+      case 'coordinator': {
+        const out = withCommonLLM({ ...base });
+        // sin search directo (delegado a subagentes)
+        if (mode) out.mode = mode;
+        if (participants.length) out.participants = participants;
+        return out;
+      }
+      case 'domain_expert': {
+        const out = withCommonLLM({ ...base });
+        // sin search por defecto
+        return out;
+      }
+      case 'normal':
+      default: {
+        const out = withCommonLLM({ ...base });
+        return out;
+      }
+    }
+  }
+
+  function readUseProfile(container) {
+    const profile = container.querySelector('#use_profile_name')?.value || '';
+    return { profile };
+  }
+
+  function readCredentialProfile(container) {
+    const profile = container.querySelector('#cred_profile_name')?.value || '';
+    const credentials = safeParse(container.querySelector('#cred_credentials')?.value || '{}', {});
+    return { profile, credentials, __sim_only: true };
+  }
+
   // simplified renderPropsFor delegator (keeps file small)
   function renderPropsFor(node, container, nodeIds = []) {
     container.innerHTML = '';
@@ -988,6 +1068,9 @@ const FormBuilder = (() => {
           case 'json_export': out = readJsonExport(container); break;
           case 'file_download': out = readFileDownload(container); break;
           case 'flow_jump': out = readFlowJump(container, node); break;
+          case 'agent_call': out = readAgentCall(container); break;
+          case 'use_profile': out = readUseProfile(container); break;
+          case 'credential_profile': out = readCredentialProfile(container); break;
           default: out = readDefault(container); break;
         }
       } catch (err) {

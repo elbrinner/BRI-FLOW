@@ -242,6 +242,61 @@
       isEmpty: (v) => (v == null) || (Array.isArray(v) && v.length === 0) || (typeof v === 'string' && v.trim() === ''),
       coalesce: (...args) => {
         for (const a of args) if (a !== null && a !== undefined && a !== '') return a; return null;
+      },
+      // List manipulation (editor only, pure functions)
+      addItem: (list, value, index) => {
+        const toArray = (src) => {
+          if (src == null) return [];
+          if (Array.isArray(src)) return [...src];
+          // if it's iterable but not string/array, spread it; else wrap as single
+          if (typeof src !== 'string' && typeof src[Symbol.iterator] === 'function') return [...src];
+          return [src];
+        };
+        const arr = toArray(list);
+        if (index === undefined || index === null || index === '' || isNaN(Number(index))) {
+          arr.push(value);
+          return arr;
+        }
+        let idx = Number(index);
+        if (!Number.isFinite(idx)) { arr.push(value); return arr; }
+        idx = Math.round(idx);
+        if (idx < 0) idx = 0;
+        if (idx > arr.length) idx = arr.length;
+        arr.splice(idx, 0, value);
+        return arr;
+      },
+      removeItem: (list, value) => {
+        const toArray = (src) => {
+          if (src == null) return [];
+          if (Array.isArray(src)) return [...src];
+          if (typeof src !== 'string' && typeof src[Symbol.iterator] === 'function') return [...src];
+          return [src];
+        };
+        const looseEq = (a, b) => {
+          if (a === b) return true;
+          if (a == null || b == null) return false;
+          const an = Number(a), bn = Number(b);
+          if (Number.isFinite(an) && Number.isFinite(bn)) return Math.abs(an - bn) < Number.EPSILON;
+          return String(a) === String(b);
+        };
+        const arr = toArray(list);
+        const idx = arr.findIndex(x => looseEq(x, value));
+        if (idx >= 0) { arr.splice(idx, 1); }
+        return arr;
+      },
+      removeAt: (list, index) => {
+        const toArray = (src) => {
+          if (src == null) return [];
+          if (Array.isArray(src)) return [...src];
+          if (typeof src !== 'string' && typeof src[Symbol.iterator] === 'function') return [...src];
+          return [src];
+        };
+        const arr = toArray(list);
+        let idx = Number(index);
+        if (!Number.isFinite(idx)) return arr;
+        idx = Math.round(idx);
+        if (idx >= 0 && idx < arr.length) arr.splice(idx, 1);
+        return arr;
       }
     };
   }

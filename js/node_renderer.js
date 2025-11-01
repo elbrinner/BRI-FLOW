@@ -17,7 +17,10 @@
     carousel: { color: '#ec4899', bg: 'linear-gradient(90deg,#fdf2f8,#fff)', icon: '🎠', label: 'Carousel' },
     file_upload: { color: '#6b7280', bg: 'linear-gradient(90deg,#f9fafb,#fff)', icon: '📎', label: 'Subir Archivo' },
     json_export: { color: '#6b7280', bg: 'linear-gradient(90deg,#f9fafb,#fff)', icon: '📄', label: 'Exportar JSON' },
-    end: { color: '#ff6b6b', bg: 'linear-gradient(90deg,#fff6f6,#fff)', icon: '🏁', label: 'Fin' }
+    end: { color: '#ff6b6b', bg: 'linear-gradient(90deg,#fff6f6,#fff)', icon: '🏁', label: 'Fin' },
+    agent_call: { color: '#6366f1', bg: 'linear-gradient(90deg,#eef2ff,#fff)', icon: '🤖', label: 'Agent Call' },
+    use_profile: { color: '#10b981', bg: 'linear-gradient(90deg,#f0fdf4,#fff)', icon: '🔐', label: 'Use Profile' },
+    credential_profile: { color: '#f59e0b', bg: 'linear-gradient(90deg,#fffbeb,#fff)', icon: '🔑', label: 'Credential Profile' }
   };
 
   // Helpers locales para formatear valores mostrados en nodos

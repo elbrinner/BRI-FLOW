@@ -74,6 +74,27 @@
     });
 
     insertBtn?.addEventListener('click', insertExampleFlow);
+
+    // Scroll suave interno para enlaces del índice
+    const body = document.getElementById('helpModalBody') || modal;
+    modal?.addEventListener('click', (ev) => {
+      const a = ev.target && ev.target.closest ? ev.target.closest('a[href^="#"]') : null;
+      if (!a) return;
+      const href = a.getAttribute('href');
+      if (!href || href.length < 2) return;
+      const target = modal.querySelector(href);
+      if (!target) return;
+      ev.preventDefault();
+      try {
+        const cRect = body.getBoundingClientRect();
+        const tRect = target.getBoundingClientRect();
+        const delta = tRect.top - cRect.top;
+        const top = body.scrollTop + delta - 8; // pequeño margen
+        body.scrollTo({ top, behavior: 'smooth' });
+      } catch(_e){
+        try { target.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' }); } catch(ee) {}
+      }
+    });
   }
 
   function bindCopyExprButtons(){

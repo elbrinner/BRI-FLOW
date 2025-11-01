@@ -17,6 +17,145 @@
   // Persistir preferencia forzada
   try{ if(typeof localStorage !== 'undefined') localStorage.setItem('simulator.preferEditorFlow','1'); }catch(_e){}
 
+  // --- Agent helpers (API base, session/thread, request build, streaming) ---
+  function ensureSimSessionId(){
+    try{
+      if(!state) state = { variables:{}, history:[], current:null, steps:0, selections:{button:{}, choice:{}} };
+      if(!state.variables.__sim_sessionId){
+        const u = (crypto && crypto.randomUUID) ? crypto.randomUUID() : (Date.now().toString(36) + Math.random().toString(36).slice(2));
+        state.variables.__sim_sessionId = u;
+      }
+      return state.variables.__sim_sessionId;
+    }catch(_e){ return '00000000-0000-0000-0000-000000000000'; }
+  }
+
+  function getAgentApiBase(){
+    try{
+      if(state && state.variables && state.variables.agent_api_base){
+        return String(state.variables.agent_api_base).trim();
+      }
+      if(typeof localStorage !== 'undefined'){
+        const v = localStorage.getItem('sim.agent_api_base');
+        if(v && v.trim()) return v.trim();
+      }
+    }catch(_e){}
+    // Fallback común dev
+    try{ return window.location.origin; }catch(_e){}
+    return 'http://localhost:5000';
+  }
+
+  // Persistencia de conectividad Agent API (último resultado)
+  function setAgentApiLastStatus(base, ok){
+    try{
+      const rec = { base: String(base||''), ok: !!ok, at: new Date().toISOString() };
+      if(typeof localStorage !== 'undefined') localStorage.setItem('sim.agent_api_status', JSON.stringify(rec));
+      // espejo en variables de estado para mostrar inline si se desea
+      try{ if(state && state.variables){ state.variables.__agent_api_status = rec; } }catch(_e){}
+    }catch(_e){}
+  }
+  function getAgentApiLastStatus(){
+    try{
+      if(state && state.variables && state.variables.__agent_api_status){ return state.variables.__agent_api_status; }
+      if(typeof localStorage !== 'undefined'){
+        const v = localStorage.getItem('sim.agent_api_status');
+        if(v){ return JSON.parse(v); }
+      }
+    }catch(_e){}
+    return null;
+  }
+  function timeAgo(iso){
+    try{
+      const d = new Date(iso); const s = Math.max(0, (Date.now() - d.getTime())/1000|0);
+      if(s < 60) return `${s}s`;
+      const m = (s/60)|0; if(m < 60) return `${m}m`;
+      const h = (m/60)|0; if(h < 24) return `${h}h`;
+      const dyy = (h/24)|0; return `${dyy}d`;
+    }catch(_e){ return ''; }
+  }
+
+  function buildAgentRequestFromNode(node){
+    const sessionId = ensureSimSessionId();
+    const threadId = (state && state.variables && state.variables.agent_thread_id) ? String(state.variables.agent_thread_id) : undefined;
+    const profile = node.agent_profile || node.props?.agent_profile || 'normal';
+    // message puede venir en node.message, node.props.message o evaluado
+    let message = node.message || node.props?.message || '';
+    try{ if(typeof message === 'string' && message.includes('{{')){ message = interpolate(message); } }catch(_e){}
+    const req = {
+      sessionId,
+      message: String(message||'')
+    };
+    if(threadId) req.threadId = threadId;
+  // agentId deshabilitado: BRI-FLOW es la fuente de verdad inline
+    // perfil
+    req.agent = profile;
+    // modelo
+    const model = node.model || node.props?.model || null;
+    if(model) req.model = model;
+    // system prompt
+    const sp = node.system_prompt || node.props?.system_prompt || null;
+    if(sp) req.systemPrompt = sp;
+    // búsqueda
+    const search = node.search || node.props?.search || null;
+    if(search) req.search = search;
+    // participantes
+    const parts = node.participants || node.props?.participants || null;
+    if(Array.isArray(parts) && parts.length) req.participants = parts;
+    // runtime
+    const runtime = node.runtime || node.props?.runtime || null;
+    if(runtime) req.runtime = runtime;
+    return req;
+  }
+
+  async function runAgentCall(node, onText, onMeta, onTool){
+    const base = getAgentApiBase();
+    const body = buildAgentRequestFromNode(node);
+    const wantsStream = !!(node.stream || node.props?.stream);
+    const url = (base.replace(/\/$/, '')) + '/api/chat';
+    const headers = {
+      'Content-Type': 'application/vnd.agent+json',
+      'Accept': wantsStream ? 'text/event-stream' : 'application/json'
+    };
+    if(!wantsStream){
+      const res = await fetch(url, { method:'POST', headers, body: JSON.stringify(body) });
+      const ok = res.ok;
+      const status = res.status;
+      if(!ok){
+        try{ setAgentApiLastStatus(base, false); }catch(_e){}
+        const t = await res.text().catch(()=> '');
+        throw new Error(`HTTP ${status} ${t||''}`.trim());
+      }
+      try{ setAgentApiLastStatus(base, true); }catch(_e){}
+      return await res.json();
+    }
+    // Streaming SSE
+    const res = await fetch(url, { method:'POST', headers, body: JSON.stringify(body) });
+    if(!res.ok || !res.body){ try{ setAgentApiLastStatus(base, false); }catch(_e){}; throw new Error(`HTTP ${res.status}`); }
+    try{ setAgentApiLastStatus(base, true); }catch(_e){}
+    const reader = res.body.getReader();
+    const dec = new TextDecoder();
+    let buffer = '';
+    let done = false;
+    while(!done){
+      const { value, done: d } = await reader.read();
+      done = d;
+      if(value){ buffer += dec.decode(value, { stream: true }); }
+      let idx;
+      while((idx = buffer.indexOf('\n\n')) !== -1){
+        const chunk = buffer.slice(0, idx).trim();
+        buffer = buffer.slice(idx + 2);
+        if(!chunk.startsWith('data:')) continue;
+        const jsonText = chunk.replace(/^data:\s*/, '');
+        try{
+          const ev = JSON.parse(jsonText);
+          if(ev.type === 'meta' && onMeta) onMeta(ev);
+          else if(ev.type === 'tool' && onTool) onTool(ev);
+          else if(ev.type === 'text' && onText) onText(ev.text || '');
+        }catch(_e){ /* ignore parse */ }
+      }
+    }
+    return { ok: true };
+  }
+
   // Multi‑flujo (básico): mapa de flujos disponibles y flujo actual
   let simFlowsById = {}; // { [flow_id]: flowObjNormalizado }
   let simCurrentFlowId = null;
@@ -1330,6 +1469,59 @@
           log('END reached.'); state.current = null; running = false;
         }
         break; }
+      case 'agent_call': {
+        const saveKey = node.save_as || null;
+        const wantsStream = !!(node.stream || node.props?.stream);
+        const bubble = document.createElement('div'); bubble.className='text-sm'; bubble.textContent='🧠 Llamando al agente…'; appendChatMessage('bot', bubble);
+        runAgentCall(node,
+          (txt)=>{ // onText
+            try{ bubble.textContent = (bubble.textContent === '🧠 Llamando al agente…') ? txt : (bubble.textContent + txt); }catch(_e){}
+          },
+          (meta)=>{ try{ if(meta && meta.threadId){ state.variables.agent_thread_id = meta.threadId; } }catch(_e){} },
+          (tool)=>{ /* opcional: render tool events */ }
+        ).then((result)=>{
+          // Non-stream path returns JSON
+          if(!wantsStream){
+            try{
+              const txt = result && result.text ? result.text : '';
+              bubble.textContent = txt || '(sin texto)';
+              if(result && result.threadId) state.variables.agent_thread_id = result.threadId;
+              if(saveKey) state.variables[saveKey] = { text: result.text, citations: result.citations||null, usage: result.usage||null, threadId: result.threadId||null };
+              // Mostrar citaciones si existen
+              if(Array.isArray(result?.citations) && result.citations.length){
+                const ul = document.createElement('ul'); ul.className='mt-2 list-disc list-inside text-xs text-gray-600';
+                result.citations.forEach(c=>{ const li=document.createElement('li'); li.textContent = (c.source || '') + (c.url ? ` (${c.url})` : ''); ul.appendChild(li); });
+                appendChatMessage('bot', ul);
+              }
+            }catch(_e){}
+          }
+          maybeAppendDiff(__prevVars);
+          state.current = gotoNext(node.next);
+          if (running) setTimeout(()=> step(), fastMode ? 0 : stepDelay);
+        }).catch((err)=>{
+          bubble.textContent = `Error llamando al agente: ${err && err.message ? err.message : String(err)}`;
+          if(saveKey) state.variables[saveKey] = { error:true, message: String(err && err.message ? err.message : err) };
+          maybeAppendDiff(__prevVars);
+          state.current = gotoNext(node.next);
+          if (running) setTimeout(()=> step(), fastMode ? 0 : stepDelay);
+        });
+        return; }
+      case 'use_profile': {
+        // Establecer perfil activo en state
+        const profileName = node.profile || node.props?.profile || 'default';
+        state._active_profile = profileName;
+        log(`USE_PROFILE -> perfil activo: ${profileName}`);
+        state.current = gotoNext(node.next);
+        break; }
+      case 'credential_profile': {
+        // Guardar credenciales en memoria simulador (sim-only)
+        const profileName = node.profile || node.props?.profile || 'sim';
+        const creds = node.credentials || node.props?.credentials || {};
+        if (!window.SIM_CREDENTIAL_PROFILES) window.SIM_CREDENTIAL_PROFILES = {};
+        window.SIM_CREDENTIAL_PROFILES[profileName] = creds;
+        log(`CREDENTIAL_PROFILE (sim-only) -> perfil ${profileName} guardado en memoria`);
+        state.current = gotoNext(node.next);
+        break; }
       default: {
         // fallback: advance to next
   state.current = gotoNext(node.next); log(`Nodo tipo desconocido (${node.type}), saltando a next`); break;
@@ -1887,6 +2079,25 @@
       const o = document.createElement('div'); o.id = 'simulatorDebugOverlay'; o.style.position = 'fixed'; o.style.right = '24px'; o.style.top = '120px'; o.style.zIndex = '99999'; o.style.background = 'rgba(17,24,39,0.95)'; o.style.color = '#fff'; o.style.padding = '8px 12px'; o.style.borderRadius = '6px'; o.style.fontSize = '12px'; o.textContent = 'simulator: 0 messages (build: ' + (window.SIMULATOR_BUILD_ID || 'unknown') + ')';
       const modal = $('simulatorModal'); if(modal) modal.appendChild(o);
     }
+    // Indicador persistente de conectividad (lee último resultado almacenado)
+    (function renderAgentApiStatus(){
+      const modalRoot = $('simulatorModal'); if(!modalRoot) return;
+      let pill = document.getElementById('agentApiStatusPill');
+      if(!pill){ pill = document.createElement('div'); pill.id = 'agentApiStatusPill'; pill.style.position='fixed'; pill.style.left='24px'; pill.style.top='120px'; pill.style.zIndex='99999'; pill.style.background='#fff'; pill.style.border='1px solid #e5e7eb'; pill.style.padding='6px 10px'; pill.style.borderRadius='9999px'; pill.style.fontSize='12px'; pill.style.boxShadow='0 1px 2px rgba(0,0,0,0.06)'; modalRoot.appendChild(pill); }
+      const last = getAgentApiLastStatus();
+      const base = getAgentApiBase();
+      let emoji = '⚪️'; let label = 'Sin probar';
+      if(last && typeof last === 'object'){
+        emoji = last.ok ? '🟢' : '🔴';
+        const ago = last.at ? timeAgo(last.at) : '';
+        const shortBase = String(last.base||base||'').replace(/^https?:\/\//,'').replace(/\/$/,'');
+        label = `${emoji} Agent API ${last.ok?'OK':'Error'} · ${shortBase}${ago?` · ${ago}`:''}`;
+      }else{
+        const shortBase = String(base||'').replace(/^https?:\/\//,'').replace(/\/$/,'');
+        label = `${emoji} Agent API · ${shortBase}`;
+      }
+      pill.textContent = label;
+    })();
   // Siempre recargar el flujo desde el editor al abrir el modal
   try { loadFlowFromEditor(); } catch(e) { console.log('Error loading flow:', e); }
   console.log('Flow loaded (from editor):', !!flow);
@@ -2097,6 +2308,39 @@
     // Snapshot antes de procesar el nodo para poder calcular diffs
     const __prevVars = deepClone(state && state.variables ? state.variables : {});
     switch(node.type){
+      case 'agent_call': {
+        const saveKey = node.save_as || null;
+        const wantsStream = !!(node.stream || node.props?.stream);
+        const bubble = document.createElement('div'); bubble.className='text-sm'; bubble.textContent='🧠 Llamando al agente…'; appendChatMessage('bot', bubble);
+        runAgentCall(node,
+          (txt)=>{ try{ bubble.textContent = (bubble.textContent === '🧠 Llamando al agente…') ? txt : (bubble.textContent + txt); }catch(_e){} },
+          (meta)=>{ try{ if(meta && meta.threadId){ state.variables.agent_thread_id = meta.threadId; } }catch(_e){} },
+          (tool)=>{ /* opcional: mostrar eventos de herramienta */ }
+        ).then((result)=>{
+          if(!wantsStream){
+            try{
+              const txt = result && result.text ? result.text : '';
+              bubble.textContent = txt || '(sin texto)';
+              if(result && result.threadId) state.variables.agent_thread_id = result.threadId;
+              if(saveKey) state.variables[saveKey] = { text: result.text, citations: result.citations||null, usage: result.usage||null, threadId: result.threadId||null };
+              if(Array.isArray(result?.citations) && result.citations.length){
+                const ul = document.createElement('ul'); ul.className='mt-2 list-disc list-inside text-xs text-gray-600';
+                result.citations.forEach(c=>{ const li=document.createElement('li'); li.textContent = (c.source || '') + (c.url ? ` (${c.url})` : ''); ul.appendChild(li); });
+                appendChatMessage('bot', ul);
+              }
+            }catch(_e){}
+          }
+          maybeAppendDiff(__prevVars);
+          state.current = gotoNext(node.next);
+          renderPreview(); updateDebugPanels(); if(state.current) presentCurrentNodeInChat(); else appendChatMessage('bot','(fin del flujo)');
+        }).catch((err)=>{
+          bubble.textContent = `Error llamando al agente: ${err && err.message ? err.message : String(err)}`;
+          if(saveKey) state.variables[saveKey] = { error:true, message: String(err && err.message ? err.message : err) };
+          maybeAppendDiff(__prevVars);
+          state.current = gotoNext(node.next);
+          renderPreview(); updateDebugPanels(); if(state.current) presentCurrentNodeInChat(); else appendChatMessage('bot','(fin del flujo)');
+        });
+        break; }
       case 'start': {
   const rawStart = getI18nText(node,'(inicio)');
   const text = processText(rawStart, looksLikeMarkdown(rawStart) || !!node.render_markdown || !!node.renderMarkdown);
