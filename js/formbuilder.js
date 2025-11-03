@@ -33,6 +33,8 @@ const FormBuilder = (() => {
       const ta = el('textarea',{id});
       ta.value = value || '';
       ta.placeholder = placeholder;
+      // Deshabilitar autocompletado del navegador en todos los textarea
+      try { ta.setAttribute('autocomplete', 'off'); } catch(_) {}
       row.appendChild(ta);
     } else {
       const inp = el('input',{id, type});
@@ -50,6 +52,8 @@ const FormBuilder = (() => {
     if (Array.isArray(value)) ta.value = value.join('\n');
     else ta.value = value ? String(value) : '';
     ta.placeholder = 'Una línea por elemento (para listas simples)';
+    // Deshabilitar autocompletado del navegador
+    try { ta.setAttribute('autocomplete', 'off'); } catch(_) {}
     row.appendChild(ta);
     return row;
   }
@@ -60,6 +64,8 @@ const FormBuilder = (() => {
     const ta = el('textarea',{id});
     ta.value = JSON.stringify(value, null, 2);
     ta.placeholder = 'Objeto JSON (edítalo si necesitas estructura más compleja)';
+    // Deshabilitar autocompletado del navegador
+    try { ta.setAttribute('autocomplete', 'off'); } catch(_) {}
     row.appendChild(ta);
     const msg = el('div',{class:'json-error', 'aria-live':'polite'});
     msg.style.color = '#b00020'; msg.style.fontSize = '12px'; msg.style.minHeight = '1.2em'; msg.style.marginTop = '4px';
@@ -394,6 +400,8 @@ const FormBuilder = (() => {
     // attach simple autocomplete for variables. options: { format: 'mustache'|'context'|'dollar' }
     attachVarAutocomplete: function(input, options = {}) {
       if (!input) return;
+      // No aplicar autocompletado a textareas para evitar problemas de ancho y UX
+      try { if ((input.tagName || '').toUpperCase() === 'TEXTAREA') return; } catch(_) {}
       // create wrapper to position suggestions
       const wrapper = el('div', { style: 'display:inline-block; position:relative;' });
       // move input into wrapper
@@ -644,6 +652,14 @@ const FormBuilder = (() => {
           if (!loc) { return; }
           optI18n[loc] = { text: (li.value || '') };
         });
+        // Resolve a display label to fallback value when value is empty
+        let firstLabel = '';
+        try {
+          if (labelInputs && labelInputs.length) firstLabel = (labelInputs[0].value || '').trim();
+        } catch(_) {}
+        // read per-option value if present
+        const valueInput = item.querySelector('input[id^="button_value_"]');
+        const optValue = valueInput ? (valueInput.value || '') : '';
         // read per-option variant if present
         const varSel = item.querySelector('select[id^="button_variant_"]');
         const optVariant = varSel ? (varSel.value || 'primary') : undefined;
@@ -661,11 +677,35 @@ const FormBuilder = (() => {
           return ((v.text || '').trim() !== '');
         });
         const opt = { i18n: optI18n, next, target };
+        // Always provide a value: user-entered or fallback to label text
+        const trimmed = (optValue || '').trim();
+        opt.value = trimmed || firstLabel || '';
         if (optVariant) opt.variant = optVariant;
         if (hasLabel || next) options.push(opt);
       });
     }
     return { i18n, mode, provider, options, optional, variant, save_as, next };
+  }
+
+  // multi_button comparte casi toda la UI con button (renderer reutilizado),
+  // pero puede añadir campos específicos (min/max/defaults) si el renderer los renderiza.
+  function readMultiButton(container) {
+    // Reutilizar lectura base del botón
+    const base = readButton(container) || {};
+    // Campos adicionales opcionales (si existen en el DOM)
+    const minRaw = container.querySelector('#mb_min input, #mb_min')?.value || '';
+    const maxRaw = container.querySelector('#mb_max input, #mb_max')?.value || '';
+    const defsRaw = container.querySelector('#mb_defaults input, #mb_defaults')?.value || '';
+    const min = String(minRaw).trim() !== '' ? Number.parseInt(String(minRaw).trim(), 10) : undefined;
+    const max = String(maxRaw).trim() !== '' ? Number.parseInt(String(maxRaw).trim(), 10) : undefined;
+    const default_values = String(defsRaw || '')
+      .split(',')
+      .map(s => s.trim())
+      .filter(Boolean);
+    if (Number.isFinite(min)) base.min_selected = min;
+    if (Number.isFinite(max)) base.max_selected = max;
+    if (default_values.length) base.default_values = default_values;
+    return base;
   }
 
 
@@ -963,7 +1003,9 @@ const FormBuilder = (() => {
   function readCredentialProfile(container) {
     const profile = container.querySelector('#cred_profile_name')?.value || '';
     const credentials = safeParse(container.querySelector('#cred_credentials')?.value || '{}', {});
-    return { profile, credentials, __sim_only: true };
+    const persist = !!container.querySelector('#cred_persist')?.checked;
+    const activate = !!container.querySelector('#cred_activate')?.checked;
+    return { profile, credentials, persist, activate, __sim_only: true };
   }
 
   // simplified renderPropsFor delegator (keeps file small)
@@ -1052,6 +1094,7 @@ const FormBuilder = (() => {
           case 'input': out = readInput(container); break;
           case 'choice': out = readChoice(container); break;
           case 'button': out = readButton(container); break;
+          case 'multi_button': out = readMultiButton(container); break;
           case 'rest_call': out = readRestCall(container); break;
           case 'assign_var': out = readAssignVar(container); break;
             case 'start': out = readStart(container); break;

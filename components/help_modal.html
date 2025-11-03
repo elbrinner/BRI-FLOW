@@ -1,27 +1,29 @@
 <template id="tpl-help-modal">
   <!-- Modal de Ayuda (como <dialog> accesible) -->
-  <dialog id="helpModal" class="w-full max-w-3xl p-0">
+  <dialog id="helpModal" class="w-full max-w-6xl p-0">
     <!-- Contenedor principal: altura limitada al viewport, sin overflow oculto para no bloquear el scroll interno -->
-    <div class="bg-white flex flex-col rounded-lg shadow-lg" style="display:flex;flex-direction:column;height:80vh;max-height:80vh;">
+    <div class="bg-white flex flex-col rounded-lg shadow-lg" style="display:flex;flex-direction:column;height:90vh;max-height:90vh;">
       <!-- Cabecera -->
       <div class="flex items-center justify-between p-4 border-b">
-        <h3 class="text-lg font-semibold">Ayuda rápida — Contar elementos y expresiones</h3>
-        <button id="helpModalClose" class="text-gray-600 hover:text-gray-900">✕</button>
+        <h3 class="text-xl font-semibold">Ayuda rápida — Contar elementos y expresiones</h3>
+        <button id="helpModalClose" class="text-gray-600 hover:text-gray-900 text-2xl">✕</button>
       </div>
       <!-- Cuerpo scrollable -->
-      <div id="helpModalBody" class="p-4 space-y-4 text-sm" style="overflow-y:auto;max-height:calc(80vh - 56px);scroll-behavior:smooth;-webkit-overflow-scrolling:touch;">
+      <div id="helpModalBody" class="p-6 space-y-4 text-base" style="overflow-y:auto;max-height:calc(90vh - 64px);scroll-behavior:smooth;-webkit-overflow-scrolling:touch;">
         <!-- Índice -->
         <div class="p-3 bg-white rounded border" id="indice">
-          <h4 class="font-semibold mb-2">Índice</h4>
+          <h4 class="font-semibold mb-2 text-lg">Índice</h4>
           <ul class="list-disc pl-6 space-y-1">
             <li><a href="#expresiones" class="text-sky-700 hover:underline">Expresiones y operadores</a></li>
             <li><a href="#funciones" class="text-sky-700 hover:underline">Funciones disponibles</a></li>
+            <li><a href="#linq" class="text-sky-700 hover:underline">Funciones tipo LINQ</a></li>
             <li><a href="#rutas" class="text-sky-700 hover:underline">Rutas a propiedades y listas</a></li>
             <li><a href="#nulos" class="text-sky-700 hover:underline">Nulos y vacíos</a></li>
             <li><a href="#uso" class="text-sky-700 hover:underline">Uso por contexto</a></li>
             <li><a href="#if" class="text-sky-700 hover:underline">Ejemplos rápidos de IF</a></li>
             <li><a href="#tipos" class="text-sky-700 hover:underline">Tipos de nodo soportados</a></li>
-            <li><a href="#ejemplos" class="text-sky-700 hover:underline">Ejemplos por tipo</a>
+            <li><a href="#sim_profiles" class="text-sky-700 hover:underline">🔧 Gestión de Perfiles del Simulador (localStorage)</a></li>
+            <li><a href="#ejemplos" class="text-sky-700 hover:underline">Ejemplos por tipo</a></li>
               <ul class="list-disc pl-6 mt-1 space-y-1">
                 <li>
                   <a href="#agent_call" class="text-sky-700 hover:underline">Agent Call</a>
@@ -32,6 +34,7 @@
                   </ul>
                 </li>
                 <li><a href="#rest_call" class="text-sky-700 hover:underline">REST Call</a></li>
+                <li><a href="#extra_node" class="text-sky-700 hover:underline">Extra</a></li>
                 <li><a href="#multi_button" class="text-sky-700 hover:underline">Multi Button</a></li>
                 <li><a href="#flow_jump_return" class="text-sky-700 hover:underline">Flow Jump / Return</a></li>
                 <li><a href="#debug_node" class="text-sky-700 hover:underline">Debug</a></li>
@@ -39,6 +42,33 @@
             </li>
           </ul>
         </div>
+          <!-- LINQ -->
+          <div class="p-3 bg-white rounded border" id="linq">
+            <h4 class="font-semibold mb-2">Funciones tipo LINQ (listas)</h4>
+            <p class="text-sm mb-2">Permiten filtrar, transformar y ordenar listas con expresiones sobre <code class="bg-gray-100 px-1 rounded">item</code> e <code class="bg-gray-100 px-1 rounded">index</code>. Útiles en <b>assign_var</b> y también dentro de plantillas <code class="bg-gray-100 px-1 rounded">{{ ... }}</code> (render del backend).</p>
+            <ul class="list-disc pl-6 space-y-1 text-sm">
+              <li><b>where(list, 'pred')</b> → filtra. Ej.: <code class="bg-gray-100 px-1 rounded">where(users, 'item.age &gt;= 18')</code></li>
+              <li><b>select(list, 'expr')</b> → proyecta. Ej.: <code class="bg-gray-100 px-1 rounded">select(users, 'item.name')</code></li>
+              <li><b>orderBy(list, 'expr')</b>, <b>orderByDesc(list, 'expr')</b> → ordena. Ej.: <code class="bg-gray-100 px-1 rounded">orderBy(users, 'item.name')</code></li>
+              <li><b>distinct(list[, 'expr'])</b> → únicos por valor o clave. Ej.: <code class="bg-gray-100 px-1 rounded">distinct(select(users,'item.id'))</code></li>
+              <li><b>take(list, n)</b>, <b>skip(list, n)</b> → paginado simple.</li>
+              <li><b>count(list)</b>, <b>sum(list[, 'expr'])</b>, <b>avg(list[, 'expr'])</b>, <b>min(list[, 'expr'])</b>, <b>max(list[, 'expr'])</b></li>
+              <li><b>first(list[, 'pred'])</b>, <b>last(list[, 'pred'])</b></li>
+              <li><b>any(list, 'pred')</b>, <b>all(list, 'pred')</b> → cuantificadores booleanos.</li>
+              <li><b>groupBy(list, 'keyExpr')</b> → agrupa en <i>{ key, items }</i>.</li>
+              <li><b>selectMany(list, 'selectorList')</b> → concatena sublistas del selector.</li>
+              <li><b>flatten(list)</b> → aplana 1 nivel de listas anidadas.</li>
+              <li><b>reduce(list, init, 'accExpr')</b> → acumulador. Ej. recomendado: <code class="bg-gray-100 px-1 rounded">reduce(nums, 0, 'acc + toNumber(item)')</code></li>
+              <li><b>union(a, b[, 'keyExpr'])</b>, <b>intersect(a, b[, 'keyExpr'])</b>, <b>except(a, b[, 'keyExpr'])</b> → operaciones de conjuntos.</li>
+              <li><b>reverse(list)</b>, <b>slice(list, start[, count])</b>, <b>indexOf(list, value)</b>, <b>findIndex(list, 'pred')</b></li>
+              <li><b>median(list[, 'expr'])</b>, <b>percentile(list, p[, 'expr'])</b>, <b>mode(list[, 'expr'])</b></li>
+              <li><b>keyBy(list, 'keyExpr')</b> → diccionario <i>clave → item</i> (la última coincidencia gana).</li>
+            </ul>
+            <p class="text-[11px] text-gray-600 mt-1">Extra: el ordenamiento soporta numérico/alfabético, <i>ignoreCase</i> y posición de nulos (<i>nullsFirst/nullsLast</i>). También permite ordenamiento por múltiples claves (<i>thenBy/thenByDesc</i>).</p>
+            <p class="text-[11px] text-gray-600 mt-1">Nota: para sumas numéricas con <code class="bg-gray-100 px-1 rounded">+</code>, convierte explícitamente cada elemento con <code class="bg-gray-100 px-1 rounded">toNumber(item)</code> para evitar concatenación de strings.</p>
+            <div class="mt-2">
+              <div class="text-xs font-semibold mb-1">Ejemplos prácticos</div>
+              <pre class="bg-gray-100 p-2 rounded text-xs">// Adultos por nombre, separados por coma
 
         <!-- Expresiones y operadores -->
         <div class="p-3 bg-white rounded border" id="expresiones">
@@ -57,6 +87,49 @@
             <li>
               Lógicos (backend IF):
               <code class="bg-gray-100 px-1 rounded">&&</code>,
+            </div>
+            <div class="mt-2">
+              <div class="text-xs font-semibold mb-1">Uso en plantillas (render backend)</div>
+              <ul class="list-disc pl-6 space-y-2 text-xs">
+                <li class="flex items-center gap-2">
+                  <code class="bg-gray-100 px-1 rounded">Adultos: {{ join(select(where(users,'item.age &gt;= 18'),'item.name'), ', ') }}</code>
+                  <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="{{ join(select(where(users,'item.age >= 18'),'item.name'), ', ') }}">Copiar</button>
+                </li>
+                <li class="flex items-center gap-2">
+                  <code class="bg-gray-100 px-1 rounded">Roles (agrupados): {{ join(select(groupBy(users,'item.role'), 'item.key'), ', ') }}</code>
+                  <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="{{ join(select(groupBy(users,'item.role'), 'item.key'), ', ') }}">Copiar</button>
+                </li>
+                <li class="flex items-center gap-2">
+                  <code class="bg-gray-100 px-1 rounded">Tags (aplanado): {{ join(selectMany(users,'item.tags'), ', ') }}</code>
+                  <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="{{ join(selectMany(users,'item.tags'), ', ') }}">Copiar</button>
+                </li>
+                <li class="flex items-center gap-2">
+                  <code class="bg-gray-100 px-1 rounded">Suma: {{ sum(nums) }}</code>
+                  <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="{{ sum(nums) }}">Copiar</button>
+                </li>
+                <li class="flex items-center gap-2">
+                  <code class="bg-gray-100 px-1 rounded">Suma (reduce): {{ reduce(nums, 0, 'acc + toNumber(item)') }}</code>
+                  <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="{{ reduce(nums, 0, 'acc + toNumber(item)') }}">Copiar</button>
+                </li>
+                <li class="flex items-center gap-2">
+                  <code class="bg-gray-100 px-1 rounded">Top 2: {{ take(orderBy(users,'item.age'), 2) }}</code>
+                  <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="{{ take(orderBy(users,'item.age'), 2) }}">Copiar</button>
+                </li>
+                <li class="flex items-center gap-2">
+                  <code class="bg-gray-100 px-1 rounded">Union IDs: {{ join(select(union(users, more_users, 'item.id'), 'item.id'), ', ') }}</code>
+                  <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="{{ join(select(union(users, more_users, 'item.id'), 'item.id'), ', ') }}">Copiar</button>
+                </li>
+                <li class="flex items-center gap-2">
+                  <code class="bg-gray-100 px-1 rounded">Mediana edad: {{ median(users, 'toNumber(item.age)') }}</code>
+                  <button type="button" class="px-2 py-0.5 text-xs bg-white border rounded copyExprBtn" data-expr="{{ median(users, 'toNumber(item.age)') }}">Copiar</button>
+                </li>
+              </ul>
+              <p class="text-[11px] text-gray-600 mt-1">Nota: las expresiones dentro de <code>{{ ... }}</code> se evalúan en el backend (incluye funciones LINQ).</p>
+            </div>
+            <div class="mt-2">
+              <div class="text-xs font-semibold mb-1">Botones dinámicos (provider)</div>
+              <p class="text-xs text-gray-700">Genera opciones desde una lista con filtro/orden y plantillas de etiqueta/valor:</p>
+              <pre class="bg-gray-100 p-2 rounded text-xs">type: "button",
               <code class="bg-gray-100 px-1 rounded">||</code>,
               <code class="bg-gray-100 px-1 rounded">!</code>
               <span class="text-xs text-gray-500">(sin paréntesis/precedencia avanzada)</span>
@@ -65,6 +138,9 @@
               Aritméticos y ternario en editor:
               <code class="bg-gray-100 px-1 rounded">+</code>,
               <code class="bg-gray-100 px-1 rounded">-</code>,
+            </div>
+          </div>
+
               <code class="bg-gray-100 px-1 rounded">*</code>,
               <code class="bg-gray-100 px-1 rounded">/</code>,
               <code class="bg-gray-100 px-1 rounded">cond ? a : b</code>
@@ -256,10 +332,147 @@ isDefined(resp.data) &amp;&amp; !isEmpty(resp.data)</pre>
             <li><b>loop</b>: foreach / while con <code>item</code> e <code>index</code></li>
             <li><b>set_goto</b>: redirige el siguiente salto por variable</li>
             <li><b>flow_jump / flow_return</b>: cambia de flujo y retorna</li>
+            <li><b>extra</b>: punto interactivo para que el cliente envíe un payload por <code>request.extra</code> y desbloquee el flujo (valor efímero; persiste con <b>assign_var</b> si lo necesitas)</li>
             <li><b>end</b>: finaliza el flujo</li>
             <li><b>debug</b>: log rápido, útil para diagnóstico</li>
           </ul>
         </div>
+
+                <!-- Perfiles del Simulador -->
+        <div class="p-3 bg-sky-50 rounded border border-sky-300" id="sim_profiles">
+          <h4 class="font-semibold mb-2 text-sky-900">🔧 Gestión de Perfiles del Simulador</h4>
+          <div class="p-3 bg-white rounded border border-sky-200 mb-3">
+            <p class="text-sm font-semibold text-sky-700 mb-2">✅ Almacenamiento seguro en localStorage</p>
+            <p class="text-sm">Los perfiles de credenciales se almacenan de forma segura en <b>localStorage del navegador</b> y solo existen en el simulador. <b>No se incluyen en el JSON del flujo</b>, por lo que no hay riesgo de exponer secretos al exportar o versionar el flujo.</p>
+          </div>
+
+          <div class="space-y-4">
+            <!-- Cómo usar la Gestión de Perfiles -->
+            <div class="border-l-4 border-green-500 pl-4 bg-green-50 p-3 rounded">
+              <h5 class="font-semibold text-lg mb-2">✅ Cómo usar la Gestión de Perfiles</h5>
+              <p class="text-sm mb-2">Usa el botón <b>"Gestión de Perfiles"</b> en la cabecera del simulador para:</p>
+              <ul class="list-disc pl-6 space-y-1 text-sm">
+                <li><b>Crear perfiles:</b> Define credenciales de Azure OpenAI y Azure AI Search</li>
+                <li><b>Editar perfiles:</b> Modifica endpoints, API keys, deployments y configuración de índices</li>
+                <li><b>Activar/desactivar:</b> Cambia entre perfiles con un solo clic</li>
+                <li><b>Gestionar entornos:</b> Separa configuraciones de dev, staging, producción, etc.</li>
+                <li><b>Ver perfil activo:</b> Identifica qué credenciales está usando el simulador en cada momento</li>
+              </ul>
+              <p class="text-sm mt-3 font-semibold text-green-700">
+                🔒 Los perfiles se guardan en localStorage (<code>sim.profiles.v1</code>) y <b>nunca</b> se incluyen en el JSON exportado. Es completamente seguro.
+              </p>
+            </div>
+
+            <!-- Campos de un perfil -->
+            <div class="border-l-4 border-blue-500 pl-4 bg-blue-50 p-3 rounded">
+              <h5 class="font-semibold text-lg mb-2">📋 Campos de un perfil</h5>
+              <p class="text-sm mb-2"><b>Azure OpenAI (obligatorio para agent_call):</b></p>
+              <ul class="list-disc pl-6 space-y-1 text-sm mb-3">
+                <li><code>aoai_endpoint</code>: URL del recurso (ej: "https://mi-openai.openai.azure.com")</li>
+                <li><code>aoai_api_key</code>: API Key de Azure OpenAI</li>
+                <li><code>aoai_api_version</code>: Versión de API (ej: "2025-01-01-preview")</li>
+                <li><code>aoai_chat_deployment</code>: Nombre del deployment (ej: "gpt-4", "gpt-4o")</li>
+              </ul>
+              <p class="text-sm mb-2"><b>Azure AI Search (opcional, para RAG):</b></p>
+              <ul class="list-disc pl-6 space-y-1 text-sm">
+                <li><code>ai_search_endpoint</code>: URL del servicio de búsqueda</li>
+                <li><code>ai_search</code>: API Key de Azure AI Search</li>
+                <li><code>ai_search_default_index</code>: Índice por defecto para consultas RAG</li>
+              </ul>
+            </div>
+
+            <!-- Flujo de trabajo -->
+            <div class="border-l-4 border-purple-500 pl-4 bg-purple-50 p-3 rounded">
+              <h5 class="font-semibold text-lg mb-2 text-purple-800">📋 Flujo de trabajo paso a paso</h5>
+              <ol class="list-decimal pl-6 space-y-2 text-sm">
+                <li><b>Abrir Gestión de Perfiles:</b> Clic en el botón "Gestión de Perfiles" en la cabecera del simulador</li>
+                <li><b>Crear nuevo perfil:</b> 
+                  <ul class="list-disc pl-6 mt-1">
+                    <li>Clic en "Nuevo Perfil"</li>
+                    <li>Asignar un nombre descriptivo (ej: "dev", "prod", "mi-cuenta-personal")</li>
+                    <li>Completar credenciales de Azure OpenAI (obligatorio)</li>
+                    <li>Opcionalmente, agregar credenciales de Azure AI Search para RAG</li>
+                  </ul>
+                </li>
+                <li><b>Guardar perfil:</b> Los datos se almacenan automáticamente en localStorage del navegador</li>
+                <li><b>Activar perfil:</b> Seleccionar el perfil deseado y hacer clic en "Activar"</li>
+                <li><b>Probar flujo:</b> Ejecutar tu flujo con nodos <code>agent_call</code> (usarán el perfil activo automáticamente)</li>
+                <li><b>Cambiar de perfil:</b> Repetir el paso 4 para activar otro perfil cuando sea necesario</li>
+                <li><b>Exportar flujo:</b> Al exportar, las credenciales NO se incluyen (totalmente seguro para versionar)</li>
+              </ol>
+            </div>
+
+            <!-- Seguridad -->
+            <div class="border-l-4 border-green-600 pl-4 bg-green-50 p-3 rounded">
+              <h5 class="font-semibold text-lg mb-2 text-green-800">🔒 Seguridad y funcionamiento</h5>
+              <div class="space-y-2 text-sm">
+                <p><b>✅ localStorage:</b> Los perfiles se almacenan localmente en tu navegador (clave <code>sim.profiles.v1</code>), nunca se envían a ningún servidor</p>
+                <p><b>✅ No se exportan:</b> Al exportar el flujo, las credenciales NO se incluyen en el JSON</p>
+                <p><b>✅ Solo simulador:</b> Los perfiles solo funcionan en el simulador, no afectan el backend de producción</p>
+                <p><b>✅ Versionado seguro:</b> Puedes commitear y versionar flujos sin preocuparte por exponer credenciales</p>
+                <p><b>✅ Por navegador:</b> Cada navegador/máquina tiene sus propios perfiles (no se sincronizan automáticamente)</p>
+              </div>
+            </div>
+
+            <!-- Backend en producción -->
+            <div class="border-l-4 border-blue-600 pl-4 bg-blue-50 p-3 rounded">
+              <h5 class="font-semibold text-lg mb-2 text-blue-800">🚀 Credenciales en Producción (Backend)</h5>
+              <p class="text-sm mb-2">Los perfiles del simulador son <b>solo para desarrollo local</b>. En producción, el backend maneja las credenciales de forma centralizada y segura:</p>
+              <ul class="list-disc pl-6 space-y-1 text-sm">
+                <li><b>Azure Key Vault:</b> Almacenamiento seguro de secretos (API keys, connection strings)</li>
+                <li><b>Variables de entorno:</b> Configuración desde <code>appsettings.json</code> o variables del sistema</li>
+                <li><b>Managed Identity:</b> Autenticación sin credenciales explícitas usando identidades administradas de Azure</li>
+                <li><b>Separación de entornos:</b> Diferentes configuraciones para dev, staging y producción</li>
+              </ul>
+              <p class="text-sm mt-3 font-semibold text-blue-700">
+                💡 Los usuarios finales nunca configuran credenciales. El backend las maneja automáticamente.
+              </p>
+            </div>
+
+            <!-- Troubleshooting -->
+            <div class="border-l-4 border-amber-500 pl-4 bg-amber-50 p-3 rounded">
+              <h5 class="font-semibold text-lg mb-2 text-amber-800">🔧 Troubleshooting</h5>
+              <details class="text-sm">
+                <summary class="font-semibold cursor-pointer hover:text-amber-900">❌ "No hay perfil activo" al ejecutar agent_call</summary>
+                <div class="mt-2 pl-4">
+                  <p class="mb-2"><b>Causa:</b> No hay ningún perfil activado en el simulador.</p>
+                  <p class="mb-2"><b>Solución:</b></p>
+                  <ol class="list-decimal pl-6 space-y-1">
+                    <li>Abre "Gestión de Perfiles"</li>
+                    <li>Si no tienes perfiles, crea uno nuevo</li>
+                    <li>Selecciona el perfil y haz clic en "Activar"</li>
+                    <li>Vuelve a ejecutar el flujo</li>
+                  </ol>
+                </div>
+              </details>
+              <details class="text-sm mt-2">
+                <summary class="font-semibold cursor-pointer hover:text-amber-900">❌ Error de autenticación (401 Unauthorized)</summary>
+                <div class="mt-2 pl-4">
+                  <p class="mb-2"><b>Causa:</b> API Key incorrecta, expirada o sin permisos.</p>
+                  <p class="mb-2"><b>Solución:</b></p>
+                  <ol class="list-decimal pl-6 space-y-1">
+                    <li>Verifica que la API Key sea correcta en Azure Portal</li>
+                    <li>Comprueba que el recurso de Azure OpenAI esté activo</li>
+                    <li>Edita el perfil en "Gestión de Perfiles" y actualiza las credenciales</li>
+                    <li>Guarda y reactiva el perfil</li>
+                  </ol>
+                </div>
+              </details>
+              <details class="text-sm mt-2">
+                <summary class="font-semibold cursor-pointer hover:text-amber-900">❌ No encuentro mis perfiles en otro navegador</summary>
+                <div class="mt-2 pl-4">
+                  <p class="mb-2"><b>Causa:</b> Los perfiles se almacenan en localStorage del navegador, no se sincronizan entre navegadores o máquinas.</p>
+                  <p class="mb-2"><b>Solución:</b></p>
+                  <ul class="list-disc pl-6 space-y-1">
+                    <li>Recrea los perfiles manualmente en cada navegador/máquina</li>
+                    <li>O exporta/importa manualmente copiando la clave <code>sim.profiles.v1</code> de localStorage</li>
+                  </ul>
+                </div>
+              </details>
+            </div>
+          </div>
+        </div>
+
 
         <!-- Insertar ejemplo -->
         <div class="p-3 bg-gray-50 rounded border">
@@ -367,11 +580,42 @@ loop_body: { node_id: "resp_item" }</pre>
 url: "https://api.example.com/user/{{ user_id }}",
 save_as: "resp"</pre>
             </details>
+            <details class="mb-2" id="extra_node"><summary class="font-semibold">Extra</summary>
+              <p class="text-xs mt-1">Nodo interactivo que espera un valor desde el cliente vía <code>request.extra</code>. El backend lo emite como elemento <i>Extra</i> con <code>nodeId</code>. El frontend decide qué enviar (p. ej., según el <code>nodeId</code>) y, al recibirlo, el flujo avanza a <code>next</code>.</p>
+              <ul class="list-disc pl-6 space-y-1 text-xs mt-1">
+                <li>El valor de <code>extra</code> es efímero en backend (se limpia al final del paso).</li>
+                <li>Si necesitas conservarlo, añade un <b>assign_var</b> inmediatamente después para copiar <code>{{ extra }}</code> a una variable.</li>
+                <li><b>No requiere prompt</b>; basta con el <code>id</code> del nodo y el <code>next</code>.</li>
+              </ul>
+              <div class="text-xs mt-2 font-semibold">Ejemplo mínimo</div>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">type: "extra",
+id: "extra_confirm",
+next: { node_id: "fin" }</pre>
+              <div class="text-xs mt-2 font-semibold">Persistir el valor con AssignVar</div>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">// extra (interactivo)
+type: "extra",
+id: "extra_datos",
+next: { node_id: "save_extra" }
+
+// asignación posterior
+type: "assign_var",
+id: "save_extra",
+assignments: [
+  { "target": "decision", "value": "{{ extra.confirm }}" }
+]</pre>
+            </details>
             <details class="mb-2" id="agent_call"><summary class="font-semibold">Agent Call</summary>
               <p class="text-xs mt-1">Invoca un agente interno. Puede emitir streaming o funcionar en modo no‑stream guardando la respuesta en una variable.</p>
               <ul class="list-disc pl-6 space-y-1 text-xs mt-1">
                 <li><b>stream=true</b>: se envían chunks de texto como <i>Stream</i>; el último evento trae <code>isFinal=true</code>.</li>
                 <li><b>stream=false</b>: no se pinta directamente; se espera la respuesta completa y se guarda en <code>save_as</code>.</li>
+              </ul>
+              <div class="text-xs mt-2 font-semibold">Sustitución de variables y {{input}}</div>
+              <ul class="list-disc pl-6 space-y-1 text-xs mt-1">
+                <li>El backend persiste automáticamente <code>request.input</code> en las variables <code>input</code> y <code>last_user_input</code> al inicio del request.</li>
+                <li>Para que el prompt incluya la entrada del usuario, usa <code>{{ input }}</code> en <b>message</b> y, si aplica, en <b>system_prompt</b>.</li>
+                <li>Evita placeholders con saltos de línea dentro de <code>{{ }}</code>; escribe <code>{{ input }}</code> en una sola línea.</li>
+                <li>Diagnóstico: los logs del backend imprimen un preview del <b>message</b> y del <b>system_prompt</b> justo antes de llamar al LLM. Si <b>message</b> está vacío, la llamada se omite de forma segura.</li>
               </ul>
               <div class="text-xs mt-2 font-semibold">Campos principales</div>
               <ul class="list-disc pl-6 space-y-1 text-xs mt-1">
@@ -423,9 +667,9 @@ stream: false</pre>
                     </tr>
                     <tr>
                       <td class="p-2 align-top">coordinator</td>
-                      <td class="p-2 align-top">Orquesta subagentes/herramientas y consolida.</td>
+                      <td class="p-2 align-top">Orquesta subagentes/herramientas y consolida la respuesta.</td>
                       <td class="p-2 align-top">Composición de varios agentes especializados.</td>
-                      <td class="p-2 align-top">Define <code>participants</code> y opcional <code>mode</code> (<i>group_chat|sequential|fanout</i>).</td>
+                      <td class="p-2 align-top">Define <code>participants</code> y opcional <code>mode</code> (<i>group_chat|sequential|fanout</i>). Orquestación real soportada en backend.</td>
                     </tr>
                     <tr class="bg-gray-50/50">
                       <td class="p-2 align-top">retrieval</td>
@@ -442,10 +686,23 @@ stream: false</pre>
                   </tbody>
                 </table>
               </div>
+              <div class="mt-2 p-2 border rounded text-[11px] text-gray-700 bg-gray-50">
+                <div class="font-semibold mb-1">Estado de soporte en el backend actual</div>
+                <ul class="list-disc pl-6 space-y-1">
+                  <li><b>normal</b>: Soportado (stream y no-stream).</li>
+                  <li><b>rag</b>: Soportado (Azure AI Search con citaciones; adjunta herramienta nativa cuando está disponible y hace <i>fallback</i> a concatenación de contexto si no).</li>
+                  <li><b>retrieval</b>: Soportado (devuelve solo <i>citations</i>; usa <code>save_as</code> y pinta luego con <b>response</b>).</li>
+                  <li><b>domain_expert</b>: Soportado como <i>normal</i> con <b>system_prompt</b> específico (sin RAG por defecto).</li>
+                  <li><b>coordinator</b>: <span class="text-emerald-700">Soportado</span>. Implementa orquestación real con modos <i>group_chat</i>, <i>sequential</i> y <i>fanout</i>; valida <code>participants</code> contra listas permitidas, preserva SSE (evento final con <code>isFinal=true</code>) y métricas por modo/participantes. Mantiene conversación vía <code>thread_var</code>.</li>
+                </ul>
+              </div>
+              <div class="mt-2 text-[11px] text-gray-600">
+                <span class="font-semibold">Notas:</span> el coordinador agrega el uso de tokens al final de la ejecución y, en <i>fanout</i>, selecciona automáticamente la mejor respuesta con una estrategia por defecto. Próximas mejoras: estrategias de selección configurables y métricas de adopción/coste.
+              </div>
               <div class="text-xs mt-2 font-semibold">Streaming (cómo habilitar y qué esperar)</div>
               <ul class="list-disc pl-6 space-y-1 text-xs mt-1">
                 <li>Activa/desactiva desde el panel del nodo: “Streaming (SSE)” o establece <code>stream: true|false</code> en el JSON.</li>
-                <li><b>stream=true</b>: el chat pinta una sola burbuja que se va actualizando con los chunks; el último evento cierra con <code>isFinal=true</code>.</li>
+                <li><b>stream=true</b>: el chat pinta una sola burbuja que se va actualizando con los chunks; el último evento cierra con <code>isFinal=true</code> e incluye <i>usage</i> y, si aplica, <i>citations</i>.</li>
                 <li><b>stream=false</b>: el nodo NO pinta nada; guarda el resultado en <code>save_as</code>. Muestra ese valor con un nodo <b>response</b> posterior, p. ej., <code>{{ agent_result.data.text }}</code>.</li>
               </ul>
               <div id="agent_options" class="text-xs mt-3 font-semibold">Opciones del agente (todas las propiedades)</div>
@@ -489,6 +746,7 @@ stream: false</pre>
                   <li>Sin <code>participants</code> → define al menos uno (p. ej., <i>domain_expert</i>, <i>retrieval</i>).</li>
                   <li>Configura <code>search</code> aquí esperando RAG → pon la búsqueda en subagentes (p. ej., participante <i>retrieval</i> o <i>rag</i>).</li>
                   <li>Modo inválido → usa <i>group_chat</i>, <i>sequential</i> o <i>fanout</i>.</li>
+                  <li>Esperas citaciones en coordinación pero no aparecen → asegúrate de incluir un participante <i>rag</i>/<i>retrieval</i> con <code>search</code> correcto. El coordinador puede adjuntar herramientas nativas según disponibilidad del SDK; si no, hará <i>fallback</i> a concatenación de contexto.</li>
                 </ul>
                 <pre class="bg-gray-100 p-2 rounded text-xs mt-1">agent: "coordinator"</pre>
               </div>
@@ -536,11 +794,29 @@ message: "Valor de x",
 payload: { "x": "{{ x }}" }</pre>
             </details>
             <details class="mb-2"><summary class="font-semibold">Form</summary>
-              <p class="text-xs mt-1">Recolecta varios campos en una sola interacción.</p>
-              <pre class="bg-gray-100 p-2 rounded text-xs mt-1">fields: [
-  { "name": "email", "label": "Email", "type": "text" },
-  { "name": "age", "label": "Edad", "type": "number" }
-]</pre>
+              <p class="text-xs mt-1">Recolecta varios campos en una sola interacción con formulario renderizado.</p>
+              <p class="text-xs mt-1"><b>Props principales:</b></p>
+              <ul class="list-disc pl-6 text-xs space-y-1">
+                <li><code>title</code>: Título del formulario (admite interpolación <code>{{ }}</code>)</li>
+                <li><code>fields</code>: Array de campos con:
+                  <ul class="list-disc pl-6 mt-1">
+                    <li><code>name</code>: Identificador del campo</li>
+                    <li><code>label</code>: Etiqueta visible (admite interpolación)</li>
+                    <li><code>placeholder</code>: Texto de ayuda en el input</li>
+                    <li><code>save_as</code> o <code>var</code>: Variable donde guardar el valor (fallback a <code>name</code>)</li>
+                  </ul>
+                </li>
+              </ul>
+              <pre class="bg-gray-100 p-2 rounded text-xs mt-2">{
+  "type": "form",
+  "title": "Datos de contacto",
+  "fields": [
+    { "name": "email", "label": "Email", "placeholder": "ejemplo@correo.com", "save_as": "user_email" },
+    { "name": "age", "label": "Edad", "placeholder": "18", "save_as": "user_age" }
+  ],
+  "next": "process_form"
+}</pre>
+              <p class="text-xs mt-2"><b>Comportamiento:</b> Al hacer clic en "Enviar", los valores se guardan en las variables especificadas y el flujo continúa al nodo <code>next</code>.</p>
             </details>
             <details class="mb-2"><summary class="font-semibold">End</summary>
               <p class="text-xs mt-1">Finaliza el flujo. Buenas prácticas: todos los flujos deben terminar en un nodo <code>end</code>.</p>

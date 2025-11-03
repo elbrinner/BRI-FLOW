@@ -12,9 +12,16 @@
     // Helpers para listas de flujos y nodos según flujo
     function buildFlowSelect(id, currentFlowId){
       const sel = el('select',{id});
-      sel.appendChild(el('option',{value:'',text:'(actual)'}));
-      const flows = Object.keys(window.AppProject?.flows || {});
-      flows.forEach(fid=>{ sel.appendChild(el('option',{value:fid,text:fid})); });
+      const flowsDict = window.AppProject?.flows || {};
+      const flows = Object.keys(flowsDict);
+      const activeId = window.AppProject?.active_flow_id || window.App?.state?.meta?.flow_id || '';
+      const activeName = (flowsDict?.[activeId]?.meta?.name) || (window.App?.state?.meta?.name) || activeId;
+      sel.appendChild(el('option',{value:'',text: activeId ? `${activeName} (actual)` : '(actual)'}));
+      flows.forEach(fid=>{
+        // Evitar duplicar el flujo actual cuando existe la opción "(actual)"
+        if (fid === activeId) return;
+        sel.appendChild(el('option',{value:fid,text:fid}));
+      });
       sel.value = currentFlowId || '';
       return sel;
     }
@@ -42,7 +49,19 @@
     const trueFlowSel = buildFlowSelect('cond_true_flow', node.true_target?.flow_id || '');
     const trueNodeSel = buildNodeSelect('cond_true_node');
     refreshNodeSelect(trueFlowSel, trueNodeSel, node.true_target?.node_id || '');
-    trueFlowSel.addEventListener('change',()=> refreshNodeSelect(trueFlowSel, trueNodeSel, ''));
+    trueFlowSel.addEventListener('change',()=>{
+      // refrescar etiqueta de '(actual)' con el nombre del flujo activo
+      try{
+        const first = trueFlowSel.querySelector('option[value=""]');
+        if(first){
+          const flowsDict = window.AppProject?.flows || {};
+          const activeId = window.AppProject?.active_flow_id || window.App?.state?.meta?.flow_id || '';
+          const activeName = (flowsDict?.[activeId]?.meta?.name) || (window.App?.state?.meta?.name) || activeId;
+          first.text = activeId ? `${activeName} (actual)` : '(actual)';
+        }
+      }catch(_e){}
+      return refreshNodeSelect(trueFlowSel, trueNodeSel, '');
+    });
     const goTrue = el('button',{type:'button',text:'Ir (TRUE)'});
     goTrue.className = 'ml-2 px-2 py-1 bg-white border rounded text-sm';
     goTrue.addEventListener('click',()=>{
@@ -71,7 +90,19 @@
     const falseFlowSel = buildFlowSelect('cond_false_flow', node.false_target?.flow_id || '');
     const falseNodeSel = buildNodeSelect('cond_false_node');
     refreshNodeSelect(falseFlowSel, falseNodeSel, node.false_target?.node_id || '');
-    falseFlowSel.addEventListener('change',()=> refreshNodeSelect(falseFlowSel, falseNodeSel, ''));
+    falseFlowSel.addEventListener('change',()=>{
+      // refrescar etiqueta de '(actual)' con el nombre del flujo activo
+      try{
+        const first = falseFlowSel.querySelector('option[value=""]');
+        if(first){
+          const flowsDict = window.AppProject?.flows || {};
+          const activeId = window.AppProject?.active_flow_id || window.App?.state?.meta?.flow_id || '';
+          const activeName = (flowsDict?.[activeId]?.meta?.name) || (window.App?.state?.meta?.name) || activeId;
+          first.text = activeId ? `${activeName} (actual)` : '(actual)';
+        }
+      }catch(_e){}
+      return refreshNodeSelect(falseFlowSel, falseNodeSel, '');
+    });
     const goFalse = el('button',{type:'button',text:'Ir (FALSE)'});
     goFalse.className = 'ml-2 px-2 py-1 bg-white border rounded text-sm';
     goFalse.addEventListener('click',()=>{

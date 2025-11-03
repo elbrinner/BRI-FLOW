@@ -33,17 +33,13 @@
   function renderButton(node, container, nodeIds){
     // validator se declara arriba para evitar TDZ cuando toggleVisibility llama a runValidation
     let validator = null;
-    // Si los templates no están listos, esperar
-    if (!window.__panelTemplatesReady) {
+    // Esperar templates sólo si aún no están cargados; usar la bandera global estándar (__templatesReady)
+    // Nota: adoptTemplate ya es tolerante (si no hay template inserta un slot fallback),
+    // por lo que esta espera es best-effort. Evitamos bloquear si los templates no exponen la bandera previa.
+    if (typeof window.__templatesReady !== 'undefined' && !window.__templatesReady) {
       container.innerHTML = '<div class="p-4 text-gray-600">Cargando template...</div>';
-      const checkReady = () => {
-        if (window.__panelTemplatesReady) {
-          renderButton(node, container, nodeIds);
-        } else {
-          setTimeout(checkReady, 100);
-        }
-      };
-      setTimeout(checkReady, 100);
+      const onReady = () => { try { renderButton(node, container, nodeIds); } catch(_) {} };
+      document.addEventListener('templates:ready', onReady, { once: true });
       return;
     }
     
@@ -82,6 +78,13 @@
           // Permitir guardar con 1 sola opción mientras tenga etiqueta
           rules.push({kind:'error', when:!st.hasStaticLabels && !st.optional, msg:'Debes definir al menos una opción con etiqueta o marcar el botón como opcional.'});
           rules.push({kind:'warning', when:!st.hasStaticLabels && st.optional, msg:'Botón opcional sin opciones: se saltará en ejecución.'});
+          // Advertir si hay opciones con etiqueta pero sin valor definido
+          const anyMissingValue = Array.isArray(st.btns) && st.btns.some(b => {
+            const hasLabel = !!(b?.label) || (b?.i18n && Object.values(b.i18n).some(v => (v?.text||'').trim()!==''));
+            const hasValue = (b?.value != null && String(b.value).trim() !== '');
+            return hasLabel && !hasValue;
+          });
+          rules.push({kind:'warning', when:anyMissingValue, msg:'Alguna opción no tiene "valor" definido; si el backend no aplica fallback, usa este campo para valores estables.'});
       }
       return rules;
     }
@@ -161,17 +164,25 @@
   // Next selector (flujo + nodo)
     const nextRow = el('div',{class:'form-row', id:'button_next_row'});
     nextRow.appendChild(el('label',{text:'Siguiente (flujo · nodo)'}));
-    const nextFlowSel = el('select',{id:'button_next_flow'});
+  const nextFlowSel = el('select',{id:'button_next_flow'});
     const getActiveFlowId = ()=> (globalThis.AppProject?.active_flow_id) || (globalThis.App?.state?.meta?.flow_id) || '';
-    const buildActualFlowOption = ()=> {
+    const getActiveFlowName = ()=> {
       const fid = getActiveFlowId();
-      const label = fid ? `${fid} (actual)` : '(actual)';
+      if(!fid) return '';
+      const flows = window.AppProject?.flows || {};
+      const name = flows?.[fid]?.meta?.name || window.App?.state?.meta?.name || fid;
+      return name;
+    };
+    const buildActualFlowOption = ()=> {
+      const name = getActiveFlowName();
+      const label = name ? `${name} (actual)` : '(actual)';
       const opt = el('option',{value:'',text:label});
       return opt;
     };
     nextFlowSel.appendChild(buildActualFlowOption());
-    const flows = Object.keys(window.AppProject?.flows || {});
-    flows.forEach(fid=> nextFlowSel.appendChild(el('option',{value:fid,text:fid})));
+  const flows = Object.keys(window.AppProject?.flows || {});
+  const activeFid = getActiveFlowId();
+  flows.forEach(fid=> { if (fid !== activeFid) nextFlowSel.appendChild(el('option',{value:fid,text:fid})); });
     nextFlowSel.value = node.next?.flow_id || '';
     const nextNodeSel = el('select',{id:'button_next'});
     function refreshNextNode(){
@@ -189,7 +200,7 @@
       // rebuild '(actual)' label in case active flow changed
       try {
         const first = nextFlowSel.querySelector('option[value=""]');
-        if (first) first.text = (function(){ const fid=getActiveFlowId(); return fid? `${fid} (actual)` : '(actual)'; })();
+        if (first) first.text = (function(){ const name=getActiveFlowName(); return name? `${name} (actual)` : '(actual)'; })();
       } catch(_e){}
       refreshNextNode();
       // persist immediately even if node select isn't touched
@@ -356,6 +367,14 @@
       const labelsWrap=el('div',{class:'labels-wrap flex flex-col gap-1'});
         locales.forEach(loc=>labelsWrap.appendChild(createLocaleInputRow(b,loc,idx)));
       row.appendChild(labelsWrap);
+      // Valor por opción (estático)
+      const valRow = el('div',{class:'form-row flex items-center gap-2'});
+      valRow.appendChild(el('label',{text:'Valor (opción)'}));
+      const valInp = el('input',{type:'text', id:`button_value_${idx}`, placeholder:'valor estable (p.ej. id)'});
+      valInp.value = b.value || '';
+      valInp.addEventListener('input', ev => { b.value = ev.target.value; });
+      valRow.appendChild(valInp);
+      row.appendChild(valRow);
     // Variante por opción (modo static)
     const optVarRow=el('div',{class:'form-row flex items-center gap-2'});
     optVarRow.appendChild(el('label',{text:'Variante (opción)'}));
@@ -369,15 +388,16 @@
     optVarRow.appendChild(optVarSel); row.appendChild(optVarRow);
   const tgtRow=el('div',{class:'form-row flex items-center gap-2'});
       tgtRow.appendChild(el('label',{text:'Destino (flujo · nodo)'}));
-      const flowSel=el('select',{id:`button_tgt_flow_${idx}`,'data-index':String(idx)});
+  const flowSel=el('select',{id:`button_tgt_flow_${idx}`,'data-index':String(idx)});
       // First option is the active flow label
       (function(){
-        const fid = getActiveFlowId();
-        const label = fid ? `${fid} (actual)` : '(actual)';
+        const name = getActiveFlowName();
+        const label = name ? `${name} (actual)` : '(actual)';
         flowSel.appendChild(el('option',{value:'',text:label}));
       })();
-      const flows = Object.keys(window.AppProject?.flows || {});
-      flows.forEach(fid=> flowSel.appendChild(el('option',{value:fid,text:fid})));
+  const flows = Object.keys(window.AppProject?.flows || {});
+  const activeFid2 = getActiveFlowId();
+  flows.forEach(fid=> { if (fid !== activeFid2) flowSel.appendChild(el('option',{value:fid,text:fid})); });
       flowSel.value = (b.target?.flow_id) || '';
       const nodeSel=el('select',{id:`button_tgt_${idx}`,'data-index':String(idx)});
       function refresh(){
@@ -396,8 +416,8 @@
         try {
           const first = flowSel.querySelector('option[value=""]');
           if (first) {
-            const fid = getActiveFlowId();
-            first.text = fid ? `${fid} (actual)` : '(actual)';
+            const name = getActiveFlowName();
+            first.text = name ? `${name} (actual)` : '(actual)';
           }
         } catch(_e){}
         refresh();

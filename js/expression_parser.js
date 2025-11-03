@@ -208,7 +208,33 @@
     return stack[0];
   }
 
-  function getFunctionRegistry() {
+  function getFunctionRegistry(ctx) {
+    // Helper para evaluar expresiones con scope { item, index, acc } sobre el contexto actual
+    function evalInScope(expr, locals){
+      try{
+        if (expr == null) return undefined;
+        // Si el selector/predicado es una función JS (defensivo), invocarla directamente
+        if (typeof expr === 'function'){
+          try { return expr(locals.item, locals.index, locals.acc); } catch(_e){ return undefined; }
+        }
+        // Si es string, evaluarlo usando el parser con variables extendidas
+        if (typeof expr === 'string'){
+          const merged = { variables: Object.assign({}, (ctx && ctx.variables) || {}, locals || {}) };
+          return evaluateExpression(expr, merged);
+        }
+        // Si es valor literal, devolverlo tal cual
+        return expr;
+      }catch(_e){ return undefined; }
+    }
+
+    // Utilidades para arrays (no mutan)
+    const asArray = (src) => {
+      if (src == null) return [];
+      if (Array.isArray(src)) return src.slice();
+      if (typeof src !== 'string' && src[Symbol && Symbol.iterator]) return [...src];
+      return [src];
+    };
+
     return {
       len: (a) => (a == null ? 0 : (Array.isArray(a) || typeof a === 'string') ? a.length : 1),
       upper: (a) => a == null ? a : String(a).toUpperCase(),
@@ -302,12 +328,124 @@
         idx = Math.round(idx);
         if (idx >= 0 && idx < arr.length) arr.splice(idx, 1);
         return arr;
+      },
+
+      // LINQ‑like helpers
+      where: (list, predicate) => {
+        const arr = asArray(list);
+        try{ return arr.filter((it, i) => !!evalInScope(predicate, { item: it, index: i })); }catch(_e){ return arr.slice(); }
+      },
+      filter: (list, predicate) => {
+        const arr = asArray(list);
+        try{ return arr.filter((it, i) => !!evalInScope(predicate, { item: it, index: i })); }catch(_e){ return arr.slice(); }
+      },
+      select: (list, selector) => {
+        const arr = asArray(list);
+        try{ return arr.map((it, i) => evalInScope(selector, { item: it, index: i })); }catch(_e){ return arr.slice(); }
+      },
+      map: (list, selector) => {
+        const arr = asArray(list);
+        try{ return arr.map((it, i) => evalInScope(selector, { item: it, index: i })); }catch(_e){ return arr.slice(); }
+      },
+      orderBy: (list, keySelector, dir) => {
+        const arr = asArray(list);
+        const direction = String(dir || 'asc').toLowerCase();
+        const asc = direction !== 'desc';
+        try{
+          return arr.slice().sort((a,b)=>{
+            const ka = keySelector ? evalInScope(keySelector, { item:a, index:0 }) : a;
+            const kb = keySelector ? evalInScope(keySelector, { item:b, index:0 }) : b;
+            if (ka == null && kb == null) return 0; if (ka == null) return asc ? -1 : 1; if (kb == null) return asc ? 1 : -1;
+            if (typeof ka === 'number' && typeof kb === 'number') return asc ? (ka - kb) : (kb - ka);
+            return asc ? String(ka).localeCompare(String(kb)) : String(kb).localeCompare(String(ka));
+          });
+        }catch(_e){ return arr.slice(); }
+      },
+      orderByDesc: (list, keySelector) => {
+        const arr = asArray(list);
+        try{
+          return arr.slice().sort((a,b)=>{
+            const ka = keySelector ? evalInScope(keySelector, { item:a, index:0 }) : a;
+            const kb = keySelector ? evalInScope(keySelector, { item:b, index:0 }) : b;
+            if (ka == null && kb == null) return 0; if (ka == null) return 1; if (kb == null) return -1;
+            if (typeof ka === 'number' && typeof kb === 'number') return (kb - ka);
+            return String(kb).localeCompare(String(ka));
+          });
+        }catch(_e){ return arr.slice().reverse(); }
+      },
+      distinct: (list, keySelector) => {
+        const arr = asArray(list); const seen = new Set(); const out = [];
+        for (let i=0;i<arr.length;i++){
+          const it = arr[i];
+          const key = keySelector ? evalInScope(keySelector, { item: it, index: i }) : it;
+          const sig = (key && typeof key === 'object') ? JSON.stringify(key) : String(key);
+          if (!seen.has(sig)) { seen.add(sig); out.push(it); }
+        }
+        return out;
+      },
+      take: (list, n) => {
+        const arr = asArray(list); const k = Number(n)||0; if (k <= 0) return [];
+        return arr.slice(0, k);
+      },
+      skip: (list, n) => {
+        const arr = asArray(list); const k = Number(n)||0; if (k <= 0) return arr.slice();
+        return arr.slice(k);
+      },
+      sum: (list, selector) => {
+        const arr = asArray(list);
+        let s = 0; for (let i=0;i<arr.length;i++){
+          const v = selector ? evalInScope(selector, { item:arr[i], index:i }) : arr[i];
+          const n = Number(v); if (Number.isFinite(n)) s += n;
+        } return s;
+      },
+      avg: (list, selector) => {
+        const arr = asArray(list); if (!arr.length) return 0;
+        let s = 0, c = 0; for (let i=0;i<arr.length;i++){
+          const v = selector ? evalInScope(selector, { item:arr[i], index:i }) : arr[i];
+          const n = Number(v); if (Number.isFinite(n)) { s += n; c++; }
+        } return c ? (s / c) : 0;
+      },
+      min: (list, selector) => {
+        const arr = asArray(list); let m = Infinity; let has=false;
+        for (let i=0;i<arr.length;i++){ const v = selector ? evalInScope(selector, {item:arr[i], index:i}) : arr[i]; const n = Number(v); if (Number.isFinite(n)) { m = Math.min(m, n); has=true; } }
+        return has ? m : null;
+      },
+      max: (list, selector) => {
+        const arr = asArray(list); let m = -Infinity; let has=false;
+        for (let i=0;i<arr.length;i++){ const v = selector ? evalInScope(selector, {item:arr[i], index:i}) : arr[i]; const n = Number(v); if (Number.isFinite(n)) { m = Math.max(m, n); has=true; } }
+        return has ? m : null;
+      },
+      count: (list, predicate) => {
+        const arr = asArray(list);
+        if (!predicate) return arr.length;
+        let c=0; for (let i=0;i<arr.length;i++){ if (evalInScope(predicate, {item:arr[i], index:i})) c++; }
+        return c;
+      },
+      first: (list, predicate) => {
+        const arr = asArray(list);
+        if (!predicate) return arr.length ? arr[0] : null;
+        for (let i=0;i<arr.length;i++){ if (evalInScope(predicate, {item:arr[i], index:i})) return arr[i]; }
+        return null;
+      },
+      last: (list, predicate) => {
+        const arr = asArray(list);
+        if (!predicate) return arr.length ? arr[arr.length-1] : null;
+        for (let i=arr.length-1;i>=0;i--){ if (evalInScope(predicate, {item:arr[i], index:i})) return arr[i]; }
+        return null;
+      },
+      reduce: (list, seed, expr) => {
+        const arr = asArray(list);
+        let acc = seed;
+        for (let i=0;i<arr.length;i++){
+          acc = evalInScope(expr, { item: arr[i], index: i, acc });
+        }
+        return acc;
       }
     };
   }
 
   function evalAst(node, ctx) {
-    const funcs = getFunctionRegistry();
+    const funcs = getFunctionRegistry(ctx);
     if (!node) return undefined;
     switch (node.type) {
       case 'literal': return node.value;
@@ -336,7 +474,7 @@
         }
         let a = evalAst(node.left, ctx);
         let b = evalAst(node.right, ctx);
-        const funcsLocal = getFunctionRegistry();
+        const funcsLocal = getFunctionRegistry(ctx);
         if (node.op === '==' || node.op === '!=') {
           if (typeof a === 'boolean' || typeof b === 'boolean') {
             const aa = (typeof a === 'boolean') ? a : (funcsLocal.bool ? funcsLocal.bool(a) : Boolean(a));

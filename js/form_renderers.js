@@ -64,7 +64,7 @@
       }
       // Agregar campo descripcion común a todos los nodos
       const descRow = el('div', { class: 'form-row' });
-      descRow.appendChild(el('label', { text: 'Descripción (opcional)' }));
+      descRow.appendChild(el('label', { text: 'Documentación, solo para referencia interna (opcional)' }));
   const descTa = el('textarea', { id: 'node_descripcion', placeholder: 'Describe el propósito de este nodo...' });
   try { descTa.value = node.descripcion || ''; } catch(e) { descTa.value = ''; }
       descTa.maxLength = 500;

@@ -61,7 +61,29 @@
     insertBtn = document.getElementById('btnInsertExample');
   }
 
-  function open(){ if (modal && typeof modal.showModal==='function'){ modal.showModal(); setTimeout(bindCopyExprButtons, 50); } }
+  function open(targetSelector){
+    if (modal && typeof modal.showModal==='function'){
+      modal.showModal();
+      setTimeout(bindCopyExprButtons, 50);
+      if (targetSelector) {
+        // Scroll diferido a la sección indicada
+        setTimeout(() => {
+          try {
+            const body = document.getElementById('helpModalBody') || modal;
+            const target = modal.querySelector(targetSelector) || modal.querySelector('#' + String(targetSelector).replace(/^#/, ''));
+            if (target && body && typeof body.scrollTo === 'function'){
+              const cRect = body.getBoundingClientRect();
+              const tRect = target.getBoundingClientRect();
+              const delta = tRect.top - cRect.top;
+              body.scrollTo({ top: body.scrollTop + delta - 8, behavior: 'smooth' });
+            } else if (target) {
+              target.scrollIntoView({ behavior: 'smooth', block: 'start', inline: 'nearest' });
+            }
+          } catch(e) { /* noop */ }
+        }, 100);
+      }
+    }
+  }
   function close(){ if (modal && typeof modal.close==='function'){ modal.close(); } }
 
   function wireModal(){
@@ -171,9 +193,9 @@
     }
   }
 
-  async function openHelp(){
+  async function openHelp(targetSelector){
     const ok = await loadTemplate();
-    if (ok) open();
+    if (ok) open(targetSelector);
   }
 
   // Exponer API mínima global

@@ -36,12 +36,32 @@
       }
     }));
     
+    // Persistencia opcional en localStorage
+    const persistRow = el('div', { class: 'form-row' });
+    const persistWrap = el('div', { style: 'display:flex; align-items:center; gap:8px;' });
+    const persistChk = el('input', { id:'cred_persist', type:'checkbox' });
+    if (props.persist === true || props.persist_to_localstorage === true) persistChk.checked = true;
+    const persistLbl = el('label', { for:'cred_persist', text:'Persistir en localStorage (simulador)' });
+    persistWrap.appendChild(persistChk); persistWrap.appendChild(persistLbl);
+    persistRow.appendChild(persistWrap);
+    container.appendChild(persistRow);
+
+    // Activar tras guardar
+    const activateRow = el('div', { class: 'form-row' });
+    const activateWrap = el('div', { style: 'display:flex; align-items:center; gap:8px;' });
+    const activateChk = el('input', { id:'cred_activate', type:'checkbox' });
+    if (props.activate === true) activateChk.checked = true;
+    const activateLbl = el('label', { for:'cred_activate', text:'Activar perfil tras guardar' });
+    activateWrap.appendChild(activateChk); activateWrap.appendChild(activateLbl);
+    activateRow.appendChild(activateWrap);
+    container.appendChild(activateRow);
+
     // Info note
     const note = el('div', {class:'form-row'});
     note.style.fontSize = '11px';
     note.style.color = '#6b7280';
     note.style.marginTop = '8px';
-    note.textContent = '🔒 Valores guardados solo en memoria del simulador. No usar localStorage. Auto-eliminado al exportar.';
+    note.textContent = '🔒 Por defecto, las credenciales se guardan solo en memoria del simulador y no se exportan. Marca "Persistir" si quieres guardarlas en este navegador (localStorage).';
     container.appendChild(note);
   }
   

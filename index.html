@@ -116,10 +116,11 @@
       <div class="draggable" draggable="true" data-type="input">⌨️ Input</div>
   <div class="draggable" draggable="true" data-type="assign_var">🔧 Assign Variable</div>
   <div class="draggable" draggable="true" data-type="button">🔘 Button</div>
-  <div class="draggable" draggable="true" data-type="multi_button" title="Permite seleccionar varias opciones">🧩 Multi-Button</div>
+  <div class="draggable" draggable="true" data-type="multi_button" title="Permite seleccionar varias opciones">✅ Multi Select Button</div> 
       <div class="draggable" draggable="true" data-type="rest_call">🔗 API REST Call</div>
 
   <div class="draggable" draggable="true" data-type="foreach" title="Itera sobre una lista (simple)">🔁 ForEach</div>
+  <div class="draggable" draggable="true" data-type="extra" title="Nodo Extra: espera valor externo del frontend">🧩 Extra</div>
 
  
       <div class="draggable" draggable="true" data-type="form">📝 Form</div>
@@ -127,12 +128,10 @@
     <div class="draggable" draggable="true" data-type="flow_jump" title="Llama a otro flujo y puede volver al origen">⤴️ Flow Jump</div>
       
   <div class="draggable" draggable="true" data-type="condition">❓ Condition (If)</div>
+    <div class="draggable" draggable="true" data-type="agent_call" title="Llamada a agente (RAG o normal)">🤖 Agent Call</div>
   <div class="draggable" draggable="true" data-type="set_goto">🔙 Set Goto</div>
   <div class="draggable" draggable="true" data-type="end" title="Nodo fin del flujo">🏁 End</div>
-  <hr style="margin: 12px 0; border-color: #e5e7eb;" />
-  <div class="draggable" draggable="true" data-type="agent_call" title="Llamada a agente (RAG o normal)">🤖 Agent Call</div>
-  <div class="draggable" draggable="true" data-type="use_profile" title="Establecer perfil de credenciales">🔐 Use Profile</div>
-  <div class="draggable" draggable="true" data-type="credential_profile" title="Perfil de credenciales (simulador only)">🔑 Credential Profile</div>
+
   
   
     </aside>
@@ -213,6 +212,7 @@
   <script src="js/renderers/loop.js"></script>
   <script src="js/renderers/response.js"></script>
   <script src="js/renderers/input.js"></script>
+  <script src="js/renderers/extra.js?v=20251101"></script>
   <script src="js/renderers/choice.js"></script>
   <script src="js/var_explorer.js"></script>
   <script src="js/renderers/assign_var.js"></script>
@@ -253,6 +253,7 @@
   <script src="js/flow_runner.js"></script>
   <script src="js/runtime_demo.js"></script>
   <script src="js/simulador.js"></script>
+  <script src="js/sim_profiles.js"></script>
   
   <script src="js/renderer_usage_report.js"></script>
   <script src="js/template_selftest.js"></script>
@@ -328,8 +329,16 @@
     <div class="w-full max-w-6xl h-[90vh] bg-white rounded-lg shadow-lg flex flex-col overflow-hidden">
       <!-- Modal header -->
       <div class="flex items-center justify-between p-4 border-b">
-        <h3 class="text-lg font-semibold">Simulador — Chat</h3>
+        <h3 class="text-lg font-semibold flex items-center gap-3">
+          Simulador — Chat
+          <span id="simProfileChip" class="hidden items-center gap-1 px-2 py-0.5 rounded-full text-xs border">
+            <span aria-hidden="true">🔐</span>
+            <span class="sp-name">(sin perfil)</span>
+            <span class="sp-status text-[10px] opacity-70"></span>
+          </span>
+        </h3>
         <div class="flex items-center gap-2">
+          <button id="btnProfilesManager" class="px-3 py-1 bg-white border rounded text-sm" title="Gestionar perfiles del simulador">Perfiles</button>
  
           <button id="btnShowHelp" class="px-3 py-1 bg-white border rounded text-sm" title="Mostrar ayuda">?</button>
           <button id="simulatorModalClose" class="text-gray-600 hover:text-gray-900">✕</button>

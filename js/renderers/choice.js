@@ -57,6 +57,13 @@
     const casesList = el('div',{id:'choice_cases_list'});
     const addCaseBtn = el('button',{type:'button',text:'Añadir caso', class:'mt-2 px-3 py-1 bg-blue-600 text-white rounded text-sm'});
     const flows = Object.keys(window.AppProject?.flows || {});
+    const getActiveFlowId = ()=> (window.AppProject?.active_flow_id) || (window.App?.state?.meta?.flow_id) || '';
+    const getActiveFlowName = ()=>{
+      const fid = getActiveFlowId();
+      if(!fid) return '';
+      const dict = window.AppProject?.flows || {};
+      return (dict?.[fid]?.meta?.name) || (window.App?.state?.meta?.name) || fid;
+    };
     function createCaseRow(c, idx){
       const row = el('div',{class:'choice-case-item', 'data-index': String(idx)});
       row.style.cssText='display:flex; flex-direction:column; gap:6px; border:1px solid #eee; padding:8px; border-radius:6px; background:#fff;';
@@ -67,8 +74,8 @@
       const destRow = el('div',{class:'form-row'});
       destRow.appendChild(el('label',{text:'Destino'}));
       const flowSel = el('select',{id:`choice_case_flow_${idx}`});
-      flowSel.appendChild(el('option',{value:'',text:'(actual)'}));
-      flows.forEach(fid=> flowSel.appendChild(el('option',{value:fid,text:fid})));
+      flowSel.appendChild(el('option',{value:'',text: (function(){ const n=getActiveFlowName(); return n? `${n} (actual)` : '(actual)'; })()}));
+      flows.forEach(fid=> { if (fid !== getActiveFlowId()) flowSel.appendChild(el('option',{value:fid,text:fid})); });
       flowSel.value = c?.target?.flow_id || '';
       const nodeSel = el('select',{id:`choice_case_node_${idx}`});
       function refreshNodeSel(){
@@ -81,8 +88,8 @@
         const want = c?.target?.node_id || cur || '';
         if(want) nodeSel.value = want;
       }
-      refreshNodeSel();
-      flowSel.addEventListener('change', refreshNodeSel);
+  refreshNodeSel();
+  flowSel.addEventListener('change', ()=>{ try{ const first = flowSel.querySelector('option[value=""]'); if(first){ const n=getActiveFlowName(); first.text = n? `${n} (actual)` : '(actual)'; } }catch(_e){}; return refreshNodeSel(); });
       const goCaseBtn = el('button',{type:'button',text:'Ir al destino'});
       goCaseBtn.className = 'ml-2 px-2 py-1 bg-white border rounded text-sm';
       goCaseBtn.addEventListener('click',()=>{
@@ -142,8 +149,8 @@
     const defRow = el('div',{class:'form-row'});
     defRow.appendChild(el('label',{text:'Default (flujo · nodo)'}));
     const defFlow = el('select',{id:'choice_default_flow'});
-    defFlow.appendChild(el('option',{value:'',text:'(actual)'}));
-    flows.forEach(fid=> defFlow.appendChild(el('option',{value:fid,text:fid})));
+    defFlow.appendChild(el('option',{value:'',text: (function(){ const n=getActiveFlowName(); return n? `${n} (actual)` : '(actual)'; })()}));
+    flows.forEach(fid=> { if (fid !== getActiveFlowId()) defFlow.appendChild(el('option',{value:fid,text:fid})); });
     defFlow.value = node.default_target?.flow_id || '';
     const defNode = el('select',{id:'choice_default_node'});
     function refreshDefNode(){
@@ -156,8 +163,8 @@
       const want = node.default_target?.node_id || cur || '';
       if(want) defNode.value = want;
     }
-    refreshDefNode();
-    defFlow.addEventListener('change', refreshDefNode);
+  refreshDefNode();
+  defFlow.addEventListener('change', ()=>{ try{ const first = defFlow.querySelector('option[value=""]'); if(first){ const n=getActiveFlowName(); first.text = n? `${n} (actual)` : '(actual)'; } }catch(_e){}; return refreshDefNode(); });
     const goDefBtn = el('button',{type:'button',text:'Ir al destino'});
     goDefBtn.className = 'ml-2 px-2 py-1 bg-white border rounded text-sm';
     goDefBtn.addEventListener('click',()=>{

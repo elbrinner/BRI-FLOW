@@ -91,6 +91,9 @@
           // Include a plain label for compatibility (first-locale or explicit label)
           const lbl = _getLabelFromOption(o);
           if (lbl) out.label = lbl;
+          // Ensure value is always present: explicit or fallback to label
+          if (o.value !== undefined && String(o.value).trim() !== '') out.value = o.value;
+          else out.value = lbl || '';
           // Preserve per-option variant if present
           if (o.variant) out.variant = o.variant;
           return out;
@@ -202,6 +205,9 @@
         const label = _getLabelFromOption(o);
         if (label) out.label = label;
         if (o.i18n && typeof o.i18n === 'object') out.i18n = JSON.parse(JSON.stringify(o.i18n));
+        // Ensure value exists: explicit or fallback to label
+        if (o.value !== undefined && String(o.value).trim() !== '') out.value = o.value;
+        else out.value = label || '';
         if (o.variant) out.variant = o.variant;
         return out;
       });
@@ -249,6 +255,38 @@
     const nodesObj = {};
     for (const id in state.nodes) nodesObj[id] = normalizeNode(state.nodes[id]);
     normalizeAllTargets(nodesObj);
+    // Quitar nodos solo-simulador (no deben persistir secretos ni perfiles)
+    const SIM_ONLY = new Set(['credential_profile','use_profile']);
+    // Reencaminar "next" que apunten a nodos sim-only (passthrough)
+    function skipSimOnlyTarget(t){
+      let current = t;
+      const guard = new Set();
+      while(current && current.node_id && nodesObj[current.node_id] && SIM_ONLY.has(nodesObj[current.node_id].type)){
+        if(guard.has(current.node_id)) break; // evitar bucles raros
+        guard.add(current.node_id);
+        const nextOfSim = nodesObj[current.node_id].next || null;
+        current = nextOfSim || null;
+      }
+      return current;
+    }
+    Object.keys(nodesObj).forEach(id => {
+      const n = nodesObj[id];
+      if(n.next) n.next = skipSimOnlyTarget(n.next);
+      if(n.true_target) n.true_target = skipSimOnlyTarget(n.true_target);
+      if(n.false_target) n.false_target = skipSimOnlyTarget(n.false_target);
+      if(n.body_start) n.body_start = skipSimOnlyTarget(n.body_start);
+      if(n.after_loop) n.after_loop = skipSimOnlyTarget(n.after_loop);
+      if(n.loop_body) n.loop_body = skipSimOnlyTarget(n.loop_body);
+      if(Array.isArray(n.options)){
+        n.options = n.options.map(o => ({...o, target: skipSimOnlyTarget(o.target||o.next||null) }));
+      }
+      if(n.cases && Array.isArray(n.cases)){
+        n.cases = n.cases.map(c => ({ when: c.when || '', target: skipSimOnlyTarget(c.target||null) }));
+        if(n.default_target) n.default_target = skipSimOnlyTarget(n.default_target);
+      }
+    });
+    // Eliminar los nodos sim-only del export
+    Object.keys(nodesObj).forEach(id => { if (SIM_ONLY.has(nodesObj[id].type)) delete nodesObj[id]; });
     // Auto-bump de versión y timestamp de modificación
     const bumpVersion = (v) => {
       if (!v || typeof v !== 'string') return '0.1.0';
@@ -261,7 +299,7 @@
     const meta = { ...(state.meta || {}) };
     meta.version = bumpVersion(meta.version);
     meta.last_modified = new Date().toISOString();
-    const out = { schema_version: 2, ...meta, nodes: nodesObj };
+  const out = { schema_version: 2, ...meta, nodes: nodesObj };
     if (out.start_node && !nodesObj[out.start_node]) out.start_node = '';
     return out;
   }

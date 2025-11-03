@@ -12,6 +12,7 @@
     'components/panel-form.html',
     'components/panel-button.html',
     'components/panel-multi_button.html',
+    'components/panel-extra.html',
     'components/help_modal.html'
   ];
 

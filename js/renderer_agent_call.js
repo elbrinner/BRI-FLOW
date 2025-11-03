@@ -13,7 +13,16 @@
   };
 
   function renderAgentCall(node, container, nodeIds) {
-    const props = node.props || {};
+    const rawProps = node.props || {};
+    // Compatibilidad: si el flujo trae valores en raíz (legacy), usarlos como default y normalizar a props.* al guardar
+    const legacy = {
+      agent_profile: node.agent_profile || node.agent || '',
+      message: node.message || '',
+      system_prompt: node.system_prompt || '',
+      stream: (typeof node.stream === 'boolean') ? node.stream : undefined,
+      save_as: node.save_as || ''
+    };
+    const props = Object.assign({}, legacy, rawProps);
     const currentProfile = props.agent_profile || 'normal';
 
     // Solo modo inline: no agentId
@@ -34,7 +43,22 @@
     });
     tipWrap.appendChild(tipIcon);
     tipWrap.appendChild(tipBox);
-    profileLabelWrap.appendChild(tipWrap);
+    //profileLabelWrap.appendChild(tipWrap);
+    // Botón de ayuda contextual
+    const helpBtn = el('button', { type:'button', text:'Ayuda' });
+    helpBtn.className = 'ml-2 px-2 py-0.5 bg-white border rounded text-xs';
+    helpBtn.addEventListener('click', () => {
+      try {
+        if (globalThis.HelpModal && typeof globalThis.HelpModal.open === 'function') {
+          globalThis.HelpModal.open('#agent_call');
+        } else {
+          // Fallback: dispara botón de ayuda global
+          const btn = document.getElementById('btnHelpDoc');
+          if (btn) btn.click();
+        }
+      } catch(e) { /* noop */ }
+    });
+    profileLabelWrap.appendChild(helpBtn);
     profileRow.appendChild(profileLabelWrap);
     const profileSel = el('select', {id:'agent_profile'});
     for (const p of ['normal', 'rag', 'coordinator', 'retrieval', 'domain_expert']) {
@@ -48,10 +72,22 @@
     profileRow.appendChild(profileSel);
     profileRow.appendChild(profileHelp);
   container.appendChild(profileRow);
+    // Nota de compatibilidad (solo si detectamos legacy)
+    const usedLegacy = (!!legacy.message || !!legacy.system_prompt || typeof legacy.stream === 'boolean' || !!legacy.save_as || !!legacy.agent_profile) && !node.props;
+    if (usedLegacy) {
+      const compatNote = el('div', { class: 'panel-note', text: 'Compatibilidad: se detectaron propiedades legacy en el nodo. Al guardar se normalizarán en props.*' });
+      compatNote.style.marginBottom = '6px';
+      container.appendChild(compatNote);
+    }
 
     // Message
-    const messageRow = inputRow({label:'Mensaje', id:'agent_message', type:'textarea', value:props.message||'', placeholder:'Prompt o pregunta del usuario'});
-  container.appendChild(messageRow);
+    const messageRow = inputRow({label:'Prompt o pregunta del usuario', id:'agent_message', type:'textarea', value:props.message||'', placeholder:'Prompt o pregunta del usuario (puedes usar {{input}} y {{context.*}})'});
+    container.appendChild(messageRow);
+    try {
+      // Autocompletado de variables (formato mustache)
+      const msgTa = container.querySelector('#agent_message');
+      if (H.attachVarAutocomplete && msgTa) H.attachVarAutocomplete(msgTa, { format: 'mustache' });
+    } catch(e) { /* best-effort */ }
 
     // Stream
     const streamRow = el('div', {class:'form-row'});
@@ -62,8 +98,13 @@
   container.appendChild(streamRow);
 
     // Save As
-    const saveAsRow = inputRow({label:'Guardar en', id:'agent_save_as', value:props.save_as||'', placeholder:'Variable para guardar respuesta'});
-  container.appendChild(saveAsRow);
+    const saveAsRow = inputRow({label:'Guardar en', id:'agent_save_as', value:props.save_as||'', placeholder:'Variable para guardar respuesta (ej.: agent_'+ (node.id || 'n') +')'});
+    container.appendChild(saveAsRow);
+    // Sugerir por defecto si está vacío
+    try {
+      const saveInp = container.querySelector('#agent_save_as');
+      if (saveInp && !props.save_as) saveInp.value = 'agent_' + (node.id || 'n');
+    } catch(e) { /* noop */ }
 
   // Tooling (array)
     const toolingRow = arrayRow({label:'Herramientas', id:'agent_tooling', value:props.tooling||[]});
@@ -81,8 +122,12 @@
   container.appendChild(modelRow);
 
     // System Prompt
-    const sysPromptRow = inputRow({label:'System Prompt', id:'agent_system_prompt', type:'textarea', value:props.system_prompt||'', placeholder:'Instrucciones del sistema (opcional)'});
-  container.appendChild(sysPromptRow);
+    const sysPromptRow = inputRow({label:'System Prompt (instrucciones que definen cómo debe comportarse)', id:'agent_system_prompt', type:'textarea', value:props.system_prompt||'', placeholder:'Instrucciones del sistema (opcional). Acepta {{variables}}'});
+    container.appendChild(sysPromptRow);
+    try {
+      const spTa = container.querySelector('#agent_system_prompt');
+      if (H.attachVarAutocomplete && spTa) H.attachVarAutocomplete(spTa, { format: 'mustache' });
+    } catch(e) { /* best-effort */ }  
 
     // Sección desplegable de Opciones avanzadas
     const advSection = el('details', { id: 'agent_adv_section' });
@@ -114,6 +159,24 @@
       const opt = el('option', { value: m, text: m || '(sin especificar)' });
       modeSelect.appendChild(opt);
     }
+    // Índices (simplificado): coma o salto de línea
+    const idxWrap = el('div', { style: 'display:flex; gap:8px; align-items:flex-start; margin-left:12px; flex:1;' });
+    const idxLabel = el('label', { text: 'Índices' });
+    idxLabel.style.minWidth = '72px';
+    const idxTa = el('textarea', { id: 'agent_search_indexes', placeholder: 'index-a\nindex-b' });
+    idxTa.rows = 2;
+    idxWrap.appendChild(idxLabel);
+    idxWrap.appendChild(idxTa);
+
+    // TopK (simplificado)
+    const topKWrap = el('div', { style: 'display:flex; gap:8px; align-items:center; margin-left:12px;' });
+    const topKLabel = el('label', { text: 'topK' });
+    topKLabel.style.minWidth = '48px';
+    const topKInput = el('input', { id: 'agent_search_topk', type: 'number', min: '1', step: '1', placeholder: '5' });
+    topKInput.style.width = '88px';
+    topKWrap.appendChild(topKLabel);
+    topKWrap.appendChild(topKInput);
+
     const semCfgWrap = el('div', { style: 'display:flex; gap:8px; align-items:center; margin-left:12px;' });
     const semCfgLabel = el('label', { text: 'Semantic configuration' });
     semCfgLabel.style.minWidth = '160px';
@@ -129,6 +192,8 @@
 
     searchSimplified.appendChild(modeLabel);
     searchSimplified.appendChild(modeSelect);
+    searchSimplified.appendChild(idxWrap);
+    searchSimplified.appendChild(topKWrap);
     searchSimplified.appendChild(semCfgWrap);
     searchSimplified.appendChild(semNote);
     advSection.appendChild(searchSimplified);
@@ -148,6 +213,15 @@
     const initialSearch = parseSearchJson();
     const initialMode = (initialSearch.mode || '').toString();
     modeSelect.value = initialMode;
+    // Inicializar índices (lista => textarea)
+    (function initIndexes(){
+      let idx = initialSearch?.indexes ?? initialSearch?.index ?? [];
+      if (typeof idx === 'string') idx = [idx];
+      if (!Array.isArray(idx)) idx = [];
+      idxTa.value = idx.join('\n');
+    })();
+    // Inicializar topK
+    if (typeof initialSearch?.topK === 'number' && initialSearch.topK > 0) topKInput.value = String(initialSearch.topK);
     semCfgInput.value = (initialSearch.semanticConfiguration || 'my-semantic-config');
 
     function applySemCfgVisibility() {
@@ -170,6 +244,22 @@
         }
       });
       applySemCfgVisibility();
+    });
+    idxTa.addEventListener('input', () => {
+      const lines = (idxTa.value || '').split('\n').map(s => s.trim()).filter(Boolean);
+      updateSearchJson(obj => {
+        if (!obj || typeof obj !== 'object') obj = {};
+        if (lines.length === 0) { delete obj.indexes; delete obj.index; }
+        else { obj.indexes = lines; if ('index' in obj) delete obj.index; }
+      });
+    });
+    topKInput.addEventListener('input', () => {
+      const n = Number(topKInput.value || '');
+      updateSearchJson(obj => {
+        if (!obj || typeof obj !== 'object') obj = {};
+        if (!Number.isFinite(n) || n <= 0) delete obj.topK; else obj.topK = Math.max(1, Math.floor(n));
+      });
+      validate(profileSel.value);
     });
     semCfgInput.addEventListener('input', () => {
       const val = semCfgInput.value;
@@ -194,6 +284,10 @@
     advSection.appendChild(advRow);
 
     const participantsRow = arrayRow({label:'Participantes (avanzado)', id:'agent_participants', value:props.participants||[]});
+    try {
+      const partTa = participantsRow.querySelector('textarea#agent_participants');
+      if (partTa) partTa.placeholder = 'Una línea por agente (ID o alias)\ncoordinator usará estos participantes en group_chat/sequential/fanout';
+    } catch(e) { /* noop */ }
     advSection.appendChild(participantsRow);
 
   // Runtime / Guardrails
@@ -341,6 +435,11 @@
           msgs.push('⚠️ Define "semanticConfiguration" (p. ej., "my-semantic-config") para modo semantic/hybrid.');
         }
       }
+      // Mensaje vacío (recomendación)
+      const msgTxt = getInputValue('agent_message');
+      if (!msgTxt) {
+        msgs.push('ℹ️ Sugerencia: agrega un Mensaje o usa {{input}} para reutilizar la entrada del usuario.');
+      }
       if (profile === 'coordinator') {
         if (partList.length === 0) msgs.push('⚠️ Define al menos un participante en "Participantes (avanzado)".');
       }
@@ -351,7 +450,7 @@
       }
       // Reglas generales de stream/save_as
       if (!isStream && !saveAs) {
-        msgs.push('⚠️ Con stream:false debes definir "save_as" para guardar el resultado.');
+        msgs.push('⚠️ Con stream:false debes definir "save_as" para guardar el resultado (p. ej., agent_'+ (node.id || 'n') +').');
       }
       if (profile === 'retrieval' && isStream) {
         msgs.push('⚠️ Retrieval no soporta streaming en UI: usa stream:false y pinta el resultado con un nodo response.');
@@ -364,8 +463,44 @@
           const p = el('div', { class: 'info-msg', text: m });
           validationBox.appendChild(p);
         }
-        const help = el('div', { class: 'info-msg', text: 'Consulta Ayuda → Agent Call → Errores comunes.' });
+        // Mensaje de ayuda + enlace clicable a Errores comunes
+        const help = el('div', { class: 'info-msg' });
+        help.appendChild(document.createTextNode('Consulta Ayuda → Agent Call → '));
+        const linkBtn = el('button', { type: 'button', text: 'Errores comunes' });
+        linkBtn.className = 'ml-1 px-2 py-0.5 bg-white border rounded text-xs';
+        linkBtn.addEventListener('click', () => {
+          try {
+            if (globalThis.HelpModal && typeof globalThis.HelpModal.open === 'function') {
+              globalThis.HelpModal.open('#agent_common_errors');
+            } else {
+              const btn = document.getElementById('btnHelpDoc');
+              if (btn) btn.click();
+            }
+          } catch(e) { /* noop */ }
+        });
+        help.appendChild(linkBtn);
         validationBox.appendChild(help);
+
+        // Si es coordinator y faltan participantes, ofrecer enlace directo a "Perfiles (tabla)"
+        const participantsMissing = (profile === 'coordinator' && partList.length === 0);
+        if (participantsMissing) {
+          const prof = el('div', { class: 'info-msg' });
+          prof.appendChild(document.createTextNode('Revisa perfiles y participantes: '));
+          const profBtn = el('button', { type: 'button', text: 'Perfiles (tabla)' });
+          profBtn.className = 'ml-1 px-2 py-0.5 bg-white border rounded text-xs';
+          profBtn.addEventListener('click', () => {
+            try {
+              if (globalThis.HelpModal && typeof globalThis.HelpModal.open === 'function') {
+                globalThis.HelpModal.open('#agent_profiles_table');
+              } else {
+                const btn = document.getElementById('btnHelpDoc');
+                if (btn) btn.click();
+              }
+            } catch(e) { /* noop */ }
+          });
+          prof.appendChild(profBtn);
+          validationBox.appendChild(prof);
+        }
       }
     }
 

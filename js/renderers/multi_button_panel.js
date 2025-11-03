@@ -86,14 +86,24 @@
     const nextRow = el('div',{class:'form-row', id:'mb_next_row', style:'display:none'});
     nextRow.appendChild(el('label',{text:'Siguiente (flujo · nodo)'}));
     const nextFlowSel = el('select',{id:'mb_next_flow'});
-    (function(){ const fid = getActiveFlowId(); const txt = fid? `${fid} (actual)` : '(actual)'; nextFlowSel.appendChild(el('option',{value:'',text:txt})); })();
+    const getActiveFlowName = ()=>{
+      const fid = getActiveFlowId();
+      if(!fid) return '';
+      const flows = globalThis.AppProject?.flows || {};
+      return flows?.[fid]?.meta?.name || globalThis.App?.state?.meta?.name || fid;
+    };
+    (function(){ const name = getActiveFlowName(); const txt = name? `${name} (actual)` : '(actual)'; nextFlowSel.appendChild(el('option',{value:'',text:txt})); })();
     const flows = Object.keys(globalThis.AppProject?.flows || {});
-    for (const fid of flows){ nextFlowSel.appendChild(el('option',{value:fid,text:fid})); }
+    for (const fid of flows){
+      // Evitar duplicar el flujo actual cuando existe la opción "(actual)"
+      if (fid === getActiveFlowId()) continue;
+      nextFlowSel.appendChild(el('option',{value:fid,text:fid}));
+    }
     nextFlowSel.value = node.next?.flow_id || '';
     const nextNodeSel = el('select',{id:'mb_next_node'});
     function refreshNextNode(){ const fid = nextFlowSel.value || getActiveFlowId(); populateNodeOptions(nextNodeSel, fid, node.id); const want = node.next?.node_id || nextNodeSel.value || ''; if(want) nextNodeSel.value = want; }
     refreshNextNode();
-    nextFlowSel.addEventListener('change',()=>{ const first=nextFlowSel.querySelector('option[value=""]'); if(first){ const fid=getActiveFlowId(); first.text = fid? `${fid} (actual)` : '(actual)'; } refreshNextNode(); const v=nextNodeSel.value||''; const f=nextFlowSel.value||''; node.next = (v||f)? { flow_id:f, node_id:v } : null; });
+  nextFlowSel.addEventListener('change',()=>{ const first=nextFlowSel.querySelector('option[value=""]'); if(first){ const name=getActiveFlowName(); first.text = name? `${name} (actual)` : '(actual)'; } refreshNextNode(); const v=nextNodeSel.value||''; const f=nextFlowSel.value||''; node.next = (v||f)? { flow_id:f, node_id:v } : null; });
     nextNodeSel.addEventListener('change',()=>{ const v=nextNodeSel.value||''; const f=nextFlowSel.value||''; node.next = (v||f)? { flow_id:f, node_id:v } : null; });
     const goNextBtn = el('button',{type:'button',text:'Ir al destino', className:'ml-2 px-2 py-1 bg-white border rounded text-sm'});
     goNextBtn.addEventListener('click',()=>{
@@ -141,13 +151,17 @@
       const tgtRow = el('div',{class:'form-row', style:'display:flex; gap:8px; align-items:center;'});
       tgtRow.appendChild(el('label',{text:'Destino (flujo · nodo)'}));
       const flowSel = el('select',{id:`mb_tgt_flow_${idx}`});
-      { const fid=getActiveFlowId(); const txt=fid? `${fid} (actual)` : '(actual)'; flowSel.appendChild(el('option',{value:'',text:txt})); }
-      for (const fid of Object.keys(globalThis.AppProject?.flows || {})){ flowSel.appendChild(el('option',{value:fid,text:fid})); }
+  { const name=getActiveFlowName(); const txt=name? `${name} (actual)` : '(actual)'; flowSel.appendChild(el('option',{value:'',text:txt})); }
+      for (const fid of Object.keys(globalThis.AppProject?.flows || {})){
+        // Evitar duplicar el flujo actual cuando existe la opción "(actual)"
+        if (fid === getActiveFlowId()) continue;
+        flowSel.appendChild(el('option',{value:fid,text:fid}));
+      }
       flowSel.value = (b.target?.flow_id) || '';
       const nodeSel = el('select',{id:`mb_tgt_${idx}`});
       function refresh(){ const fid = flowSel.value || getActiveFlowId(); populateNodeOptions(nodeSel, fid, node.id); const want = b.target?.node_id || nodeSel.value || ''; if(want) nodeSel.value = want; }
       refresh();
-      flowSel.addEventListener('change',()=>{ const first=flowSel.querySelector('option[value=""]'); if(first){ const fid=getActiveFlowId(); first.text=fid? `${fid} (actual)` : '(actual)'; } refresh(); const v=nodeSel.value||''; const f=flowSel.value||''; b.target = (v||f)? { flow_id:f, node_id:v } : null; if(!v && !f) delete b.next; });
+  flowSel.addEventListener('change',()=>{ const first=flowSel.querySelector('option[value=""]'); if(first){ const name=getActiveFlowName(); first.text=name? `${name} (actual)` : '(actual)'; } refresh(); const v=nodeSel.value||''; const f=flowSel.value||''; b.target = (v||f)? { flow_id:f, node_id:v } : null; if(!v && !f) delete b.next; });
       nodeSel.addEventListener('change',()=>{ const v=nodeSel.value||''; const f=flowSel.value||''; b.target = (v||f)? { flow_id:f, node_id:v } : null; if(!v && !f) delete b.next; });
       const goBtn = el('button',{type:'button',text:'Ir al destino', className:'ml-2 px-2 py-1 bg-white border rounded text-sm'});
       goBtn.addEventListener('click',()=>{
@@ -229,5 +243,8 @@
   }
 
   globalThis.RendererRegistry = globalThis.RendererRegistry || {};
-  globalThis.RendererRegistry.multi_button = renderMulti;
+  // Registrar este panel solo si no hay ya un renderer multi_button definido (evitar colisión con multi_button.js)
+  if (!globalThis.RendererRegistry.multi_button) {
+    globalThis.RendererRegistry.multi_button = renderMulti;
+  }
 })();

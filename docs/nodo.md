@@ -68,6 +68,112 @@ Nota: el JSON generado por el editor requiere un backend/intérprete externo (no
 - Simulador: `mock_mode` (`off|fallback|always`), `mock` (objeto JSON).
 - Mappings: cada mapping `{ name, path, type }` asigna variables desde `response`/`response.data`.
 
+## Agente (agent_call)
+- Type: `agent_call`
+- Propósito: Invoca un agente de conversación integrado (Agent Framework) con opción de streaming SSE o ejecución sin streaming guardando en variable.
+- Props clave:
+  - `agent` | `agent_profile` (string): perfil del agente. Valores: `normal`, `rag`, `coordinator`, `retrieval`, `domain_expert`.
+  - `message` (string): texto del usuario; admite plantillas `{{ }}`. Recomendado: `{{ input }}`.
+  - `system_prompt` (string): instrucciones/rol del sistema.
+  - `thread_var` (string): variable para conservar el id de hilo entre turnos.
+  - `stream` (bool): `true` para SSE (pinta una sola burbuja incremental); `false` para ejecución sincronizada.
+  - `save_as` (string): variable destino de la respuesta (clave cuando `stream=false` o en modo `retrieval`).
+  - `search` (obj, opcional): configuración de búsqueda para `rag/retrieval` (p. ej., `mode`, `indexes`, `topK`, `semanticConfiguration`).
+  - `participants` (array, opcional): cuando `agent = "coordinator"`, define sub‑agentes a orquestar. Valores:
+    - `retrieval`: prepara contexto (no genera texto por sí mismo).
+    - `rag`: usa RAG (adjunta herramienta nativa cuando está disponible y, si no, concatena contexto) y cita fuentes cuando aplique.
+    - `domain_expert`: tono/políticas de experto.
+    - `normal`: asistente general.
+  - `mode` (string, opcional): sólo con `agent = "coordinator"`. Valores soportados: `sequential`, `group_chat`, `fanout`.
+    - `sequential`: ejecuta participantes en orden; el último se emite en streaming si `stream=true`.
+    - `group_chat`: rondas cortas entre participantes y una síntesis final (el paso de síntesis se streamea).
+    - `fanout`: ejecuta participantes en paralelo, selecciona una respuesta ganadora por heurística simple (domain_expert > rag > longitud) y suma el coste total.
+
+Notas importantes
+- El backend persiste automáticamente `request.input` en las variables `input` y `last_user_input` al inicio del request; usa `{{ input }}` en `message/system_prompt` para inyectarlo.
+- Evita `{{ }}` con saltos de línea; escribe `{{ input }}` en una sola línea.
+- Si `message` queda vacío, el backend omite la llamada para evitar errores y lo reporta en logs.
+
+Perfiles y soporte actual
+
+| Perfil          | Descripción breve                                      | Estado backend |
+|-----------------|---------------------------------------------------------|----------------|
+| normal          | Conversación sin recuperación externa                   | OK             |
+| rag             | Grounding con Azure AI Search + citaciones              | OK (tool nativa cuando disponible; fallback a concatenación) |
+| retrieval       | Solo recuperación (no genera texto)                     | OK             |
+| domain_expert   | Experto con políticas/tono; sin RAG por defecto         | OK (como normal con prompt de dominio) |
+| coordinator     | Orquesta subagentes y fusiona respuestas                | Real (modes: sequential, group_chat, fanout; mínimos) |
+
+Ejemplo mínimo (no‑stream → pintar luego con `response`)
+
+```json
+{
+  "id": "ag_pregunta",
+  "type": "agent_call",
+  "agent": "rag",
+  "message": "{{ input }}",
+  "system_prompt": "Responde con citas cuando existan.",
+  "thread_var": "agent_thread_id",
+  "search": { "mode": "hybrid", "indexes": ["docs-es"], "topK": 5, "semanticConfiguration": "semantic-es" },
+  "save_as": "agent_result",
+  "stream": false,
+  "next": "r_mostrar"
+}
+```
+
+Luego en `response`:
+
+```json
+{
+  "id": "r_mostrar",
+  "type": "response",
+  "i18n": { "es": { "text": ["{{ agent_result.data.text }}"] } },
+  "next": "end"
+}
+```
+
+> Nota: `coordinator` implementado con modos `sequential`, `group_chat` y `fanout`. El evento final de SSE incluye `isFinal=true`, `usage` agregado y, si aplica, `citations`. Heurística y métricas pueden evolucionar manteniendo compatibilidad con `save_as`.
+
+### Ejemplos rápidos — coordinator
+
+Secuencial con 3 participantes (retrieval → domain_expert → rag)
+
+```json
+{
+  "id": "ag_coord_seq",
+  "type": "agent_call",
+  "agent": "coordinator",
+  "mode": "sequential",
+  "participants": ["retrieval","domain_expert","rag"],
+  "message": "{{ input }}",
+  "system_prompt": "Consolida respuestas claras usando el contexto when available.",
+  "thread_var": "agent_thread_id",
+  "search": { "mode": "hybrid", "indexes": ["docs-es"], "topK": 5, "semanticConfiguration": "semantic-es" },
+  "stream": false,
+  "save_as": "agent_result",
+  "next": "r_mostrar"
+}
+```
+
+Group chat con síntesis final (streameada)
+
+```json
+{
+  "id": "ag_coord_gc",
+  "type": "agent_call",
+  "agent": "coordinator",
+  "mode": "group_chat",
+  "participants": ["domain_expert","rag"],
+  "message": "{{ input }}",
+  "system_prompt": "Facilita un debate breve entre participantes y sintetiza una única respuesta final.",
+  "thread_var": "agent_thread_id",
+  "search": { "mode": "semantic", "indexes": ["docs-es"], "topK": 3, "semanticConfiguration": "semantic-es" },
+  "stream": true,
+  "next": "end"
+}
+```
+
+
 ## Condición (condition)
 - Type: `condition`
 - Propósito: Evalúa `expr` y salta a `true_target` o `false_target`.
@@ -123,6 +229,40 @@ Nota: el JSON generado por el editor requiere un backend/intérprete externo (no
 - Type: `end`
 - Propósito: Termina el flujo.
 - Conexiones: no debe tener `next`.
+
+## Extra (extra)
+- Type: `extra`
+- Propósito: Marca un punto interactivo para que el frontend envíe un payload efímero en `request.extra` hacia el backend. Útil para integraciones puntuales o para pasar metadatos del cliente sin usar `input/choice`.
+- Props:
+  - `next`: nodo destino cuando llega `extra`.
+  - `optional`: si está presente, el intérprete puede decidir saltarlo si `extra` no llega (depende del backend).
+- Notas:
+  - No requiere `prompt`. El frontend solo necesita el `id` del nodo para decidir qué enviar.
+  - El valor de `extra` NO se persiste automáticamente: es efímero por paso. Si quieres guardarlo, añade un `assign_var` inmediatamente después para copiar `{{extra}}` o una ruta (`{{extra.algo}}`) a una variable.
+  - El editor no ejecuta lógica de backend; en el simulador se muestra un mensaje genérico y un área para simular el `extra`.
+
+Ejemplo mínimo:
+
+```json
+{
+  "id": "n_extra_confirma",
+  "type": "extra",
+  "next": "r_gracias"
+}
+```
+
+Patrón de persistencia posterior:
+
+```json
+{
+  "id": "a_guardar_extra",
+  "type": "assign_var",
+  "assignments": [
+    { "target": "vars.last_extra", "value": "{{extra}}" }
+  ],
+  "next": "r_sigue"
+}
+```
 
 ---
 

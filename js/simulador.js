@@ -14,10 +14,31 @@
   let showDiffs = true; // mostrar diffs de variables en chat/panel
   let useRealHttp = true; // usar llamadas HTTP reales en lugar de mock
   let preferEditorFlow = true; // forzado: siempre recargar del editor al iniciar
+  // Control de vida de la variable efímera "extra" cuando proviene de un nodo extra
+  // TTL=1: disponible durante el siguiente paso y se limpia al finalizar ese paso siguiente
+  let __extraTtl = 0;
   // Persistir preferencia forzada
   try{ if(typeof localStorage !== 'undefined') localStorage.setItem('simulator.preferEditorFlow','1'); }catch(_e){}
 
   // --- Agent helpers (API base, session/thread, request build, streaming) ---
+  // Cargar configuración local opcional (docs/sim.local.json) para endpoints/mocks
+  async function loadLocalConfig(){
+    try{
+      const url = 'docs/sim.local.json?ts=' + Date.now();
+      const res = await fetch(url);
+      if(!res.ok) return;
+      const cfg = await res.json();
+      try{ window.SIM_LOCAL_CONFIG = cfg; }catch(_e){}
+      // Persistir agent_api_base para que getAgentApiBase lo tome
+      if(cfg && cfg.agent_api_base){
+        try{ if(typeof localStorage !== 'undefined') localStorage.setItem('sim.agent_api_base', String(cfg.agent_api_base)); }catch(_e){}
+      }
+      // Forzar modo mock HTTP global si corresponde
+      if(cfg && cfg.http_mock_global === true){ useRealHttp = false; }
+      // Reflejar en variables para inspección
+      try{ if(state && state.variables){ state.variables.__sim_local_config = cfg; if(cfg.agent_api_base) state.variables.agent_api_base = String(cfg.agent_api_base); } }catch(_e){}
+    }catch(_e){ /* ignorar si no existe */ }
+  }
   function ensureSimSessionId(){
     try{
       if(!state) state = { variables:{}, history:[], current:null, steps:0, selections:{button:{}, choice:{}} };
@@ -107,53 +128,358 @@
   }
 
   async function runAgentCall(node, onText, onMeta, onTool){
+    const wantsStream = !!(node.stream || node.props?.stream);
+    const agentProfile = node.agent_profile || node.props?.agent_profile || 'normal';
+    
+    // 1) Resolver mock global/nodo
+    const localAgentCfg = (typeof window !== 'undefined' && window.SIM_LOCAL_CONFIG) ? (window.SIM_LOCAL_CONFIG.agent || {}) : {};
+    const mockMode = (node.props && node.props.mock_mode) ? node.props.mock_mode : (localAgentCfg.mock_mode || 'off');
+    const mockData = (node.props && node.props.mock !== undefined) ? node.props.mock : (localAgentCfg.mock !== undefined ? localAgentCfg.mock : undefined);
+    if(mockMode === 'always'){
+      if(wantsStream){ if(onText && mockData && typeof mockData.text === 'string') onText(String(mockData.text)); return { ok:true, mocked:true }; }
+      return { text: (mockData && mockData.text) || '(mock agent)', citations: mockData?.citations||null, usage: mockData?.usage||null, threadId: mockData?.threadId||null, mocked:true };
+    }
+
+    // 2) ¿Proveedor directo? (p. ej., azure-openai)
+  const model = node.model || node.props?.model || {};
+  // Normalizar provider (admitir alias comunes)
+  let provider = (model && model.provider) ? String(model.provider).toLowerCase() : '';
+  if (provider) provider = provider.replace(/_/g, '-');
+  if (provider === 'azure' || provider === 'aoai' || provider === 'openai-azure') provider = 'azure-openai';
+
+    async function callAzureOpenAI(){
+      // Resolver credenciales desde perfiles sim o variables
+      // Determinar perfil activo: estado -> SIM_PROFILES -> 'default'
+      let activeProfile = (state && state._active_profile)
+        ? state._active_profile
+        : (window.SIM_PROFILES && typeof window.SIM_PROFILES.getActiveProfile === 'function'
+            ? (window.SIM_PROFILES.getActiveProfile() || null)
+            : null);
+      // Fallback adicional: leer de localStorage si aún no tenemos nombre activo
+      try{
+        if(!activeProfile && typeof localStorage !== 'undefined'){
+          const ap = localStorage.getItem('sim.active_profile');
+          if(ap && ap.trim()) {
+            activeProfile = ap.trim();
+            console.log('[AOAI] Perfil activo desde localStorage (fallback):', JSON.stringify(activeProfile));
+          }
+        }
+      }catch(_e){}
+      if(!activeProfile) activeProfile = 'default';
+      
+      console.log('[AOAI] Perfil activo final (después de todos los fallbacks):', JSON.stringify(activeProfile), 'length:', activeProfile.length);
+      
+      let profiles = {};
+      // Siempre leer desde localStorage para garantizar sincronización
+      try{
+        const raw = localStorage.getItem('sim.profiles.v1');
+        console.log('[AOAI] localStorage raw:', raw ? 'presente ('+ raw.length +' chars)' : 'AUSENTE');
+        if(raw){ 
+          const obj = JSON.parse(raw);
+          console.log('[AOAI] Objeto parseado:', obj ? 'ok' : 'null');
+          console.log('[AOAI] obj.profiles existe?', obj && obj.profiles ? 'sí' : 'no');
+          if(obj && obj.profiles) {
+            profiles = obj.profiles;
+            // Sincronizar con memoria
+            window.SIM_CREDENTIAL_PROFILES = profiles;
+            console.log('[AOAI] Perfiles cargados desde localStorage:', Object.keys(profiles));
+            console.log('[AOAI] Estructura completa de profiles:', profiles);
+          }
+        } else {
+          console.log('[AOAI] ⚠️ No hay perfiles en localStorage');
+        }
+      }catch(_e){ 
+        console.error('[AOAI] Error leyendo perfiles:', _e); 
+        // Fallback a memoria si existe
+        if(typeof window !== 'undefined' && window.SIM_CREDENTIAL_PROFILES) {
+          profiles = window.SIM_CREDENTIAL_PROFILES;
+          console.log('[AOAI] Usando perfiles desde memoria (fallback):', Object.keys(profiles));
+        }
+      }
+      
+      // DEBUG: Log del perfil seleccionado
+      const selectedProfile = profiles[activeProfile];
+      console.log('[AOAI] Perfil seleccionado ['+activeProfile+']:', selectedProfile ? 'encontrado' : 'NO ENCONTRADO');
+      if(selectedProfile){
+        console.log('[AOAI] Campos del perfil:', {
+          endpoint: selectedProfile.aoai_endpoint ? 'presente' : 'ausente',
+          api_key: selectedProfile.aoai_api_key ? 'presente' : 'ausente',
+          chat_deployment: selectedProfile.aoai_chat_deployment ? 'presente' : 'ausente'
+        });
+        console.log('[AOAI] Valores reales del perfil:', selectedProfile);
+      } else {
+        console.error('[AOAI] ❌ profiles object:', profiles);
+        console.error('[AOAI] ❌ Buscando clave:', activeProfile);
+        console.error('[AOAI] ❌ Claves disponibles:', Object.keys(profiles));
+      }
+      
+      // Construir credenciales: perfil como base, variables del estado solo si existen
+      const profileCreds = (profiles && profiles[activeProfile]) || {};
+      const cred = {
+        aoai_endpoint: (state && state.variables && state.variables.aoai_endpoint) || profileCreds.aoai_endpoint,
+        aoai_api_key: (state && state.variables && state.variables.aoai_api_key) || profileCreds.aoai_api_key,
+        aoai_api_version: (state && state.variables && state.variables.aoai_api_version) || profileCreds.aoai_api_version,
+        aoai_chat_deployment: (state && state.variables && state.variables.aoai_chat_deployment) || profileCreds.aoai_chat_deployment
+      };
+      
+      const endpoint = String(cred.aoai_endpoint || '').trim();
+      const apiKey = String(cred.aoai_api_key || '').trim();
+      const apiVersion = String(cred.aoai_api_version || model.api_version || '2025-01-01-preview').trim();
+      const deployment = String(cred.aoai_chat_deployment || model.deployment || '').trim();
+      
+      // DEBUG: Log de las credenciales finales
+      console.log('[AOAI] Credenciales finales:', {
+        endpoint: endpoint ? endpoint.substring(0,30)+'...' : 'VACIO',
+        apiKey: apiKey ? 'presente ('+apiKey.length+' chars)' : 'VACIO',
+        deployment: deployment || 'VACIO'
+      });
+      
+      if(!endpoint || !apiKey || !deployment){ throw new Error('Faltan credenciales Azure OpenAI: endpoint/apiKey/deployment'); }
+      const url = endpoint.replace(/\/$/, '') + `/openai/deployments/${encodeURIComponent(deployment)}/chat/completions?api-version=${encodeURIComponent(apiVersion)}`;
+      
+      // Construir mensajes a partir del nodo
+      let userMsg = node.message || node.props?.message || '';
+      try{ if(typeof userMsg === 'string' && userMsg.includes('{{')){ userMsg = interpolate(userMsg); } }catch(_e){}
+      const sysMsg = node.system_prompt || node.props?.system_prompt || '';
+      
+      // RAG: Si el perfil es 'rag', realizar búsqueda en Azure AI Search
+      let ragContext = null;
+      if(agentProfile === 'rag'){
+        console.log('[RAG] Perfil RAG detectado, iniciando búsqueda en Azure AI Search...');
+        try{
+          const searchEndpoint = (state && state.variables && state.variables.ai_search_endpoint) || profileCreds.ai_search_endpoint;
+          const searchApiKey = (state && state.variables && state.variables.ai_search) || profileCreds.ai_search;
+          const searchIndex = (node.search && node.search.index) || (node.props?.search?.index) || (state && state.variables && state.variables.ai_search_default_index) || profileCreds.ai_search_default_index;
+          const searchTopK = (node.search && node.search.top_k) || (node.props?.search?.top_k) || 3;
+          const searchApiVersion = '2023-11-01';
+          
+          if(!searchEndpoint || !searchApiKey || !searchIndex){
+            console.warn('[RAG] Faltan credenciales de Azure AI Search (endpoint/apiKey/index), continuando sin RAG');
+          } else {
+            const searchUrl = searchEndpoint.replace(/\/$/, '') + `/indexes/${encodeURIComponent(searchIndex)}/docs/search?api-version=${searchApiVersion}`;
+            const searchPayload = {
+              search: userMsg || '',
+              top: searchTopK,
+              select: '*',
+              searchMode: 'any'
+            };
+            console.log('[RAG] Consultando:', searchUrl.substring(0, 80) + '...', 'query:', userMsg.substring(0, 50));
+            const searchRes = await fetch(searchUrl, {
+              method: 'POST',
+              headers: {
+                'Content-Type': 'application/json',
+                'api-key': searchApiKey
+              },
+              body: JSON.stringify(searchPayload)
+            });
+            
+            if(searchRes.ok){
+              const searchJson = await searchRes.json();
+              const results = searchJson.value || [];
+              console.log('[RAG] Encontrados', results.length, 'resultados');
+              
+              if(results.length > 0){
+                // Construir contexto RAG con los resultados
+                ragContext = results.map((r, idx) => {
+                  const content = r.content || r.text || r.description || JSON.stringify(r);
+                  const source = r.metadata_storage_name || r.title || r.id || `doc_${idx+1}`;
+                  return `[${idx+1}] ${source}:\n${content}`;
+                }).join('\n\n');
+                console.log('[RAG] Contexto construido:', ragContext.substring(0, 200) + '...');
+              }
+            } else {
+              console.error('[RAG] Error en búsqueda:', searchRes.status, await searchRes.text().catch(() => ''));
+            }
+          }
+        } catch(searchErr){
+          console.error('[RAG] Error ejecutando búsqueda:', searchErr);
+        }
+      }
+      
+      const messages = [];
+      if(sysMsg) messages.push({ role:'system', content: String(sysMsg) });
+      
+      // Si hay contexto RAG, agregarlo antes del mensaje del usuario
+      if(ragContext){
+        messages.push({ 
+          role:'system', 
+          content: `Contexto de búsqueda:\n\n${ragContext}\n\nUtiliza esta información para responder la siguiente pregunta.` 
+        });
+      }
+      
+      messages.push({ role:'user', content: String(userMsg || state?.variables?.input || '') });
+      
+      const payload = {
+        messages,
+        temperature: (typeof model.temperature === 'number') ? model.temperature : 0.2,
+        max_tokens: (typeof model.max_tokens === 'number') ? model.max_tokens : undefined,
+        stream: !!wantsStream
+      };
+      const headers = {
+        'Content-Type': 'application/json',
+        'api-key': apiKey,
+        'Accept': wantsStream ? 'text/event-stream' : 'application/json'
+      };
+      if(!wantsStream){
+        try{
+          const res = await fetch(url, { method:'POST', headers, body: JSON.stringify(payload) });
+          if(!res.ok){ const t = await res.text().catch(()=> ''); throw new Error(`HTTP ${res.status} ${t||''}`.trim()); }
+          const json = await res.json();
+          const text = json?.choices?.[0]?.message?.content || '';
+          const usage = json?.usage || null;
+          return { text, citations: null, usage, threadId: null };
+        }catch(err){ if(mockMode === 'fallback' && mockData !== undefined){ return { text: (mockData && mockData.text) || '(mock agent)', citations: null, usage: null, threadId: null, mocked:true }; } throw err; }
+      } else {
+        try{
+          const res = await fetch(url, { method:'POST', headers, body: JSON.stringify(payload) });
+          if(!res.ok || !res.body){ throw new Error(`HTTP ${res.status}`); }
+          const reader = res.body.getReader();
+          const dec = new TextDecoder();
+          let buffer = '';
+          let done = false;
+          while(!done){
+            const { value, done: d } = await reader.read();
+            done = d;
+            if(value){ buffer += dec.decode(value, { stream: true }); }
+            let idx;
+            while((idx = buffer.indexOf('\n\n')) !== -1){
+              const chunk = buffer.slice(0, idx).trim();
+              buffer = buffer.slice(idx + 2);
+              if(!chunk.startsWith('data:')) continue;
+              const jsonText = chunk.replace(/^data:\s*/, '');
+              if(jsonText === '[DONE]') { /* fin */ continue; }
+              try{
+                const ev = JSON.parse(jsonText);
+                // Formato OpenAI/Azure: choices[].delta.content
+                const delta = ev?.choices?.[0]?.delta?.content;
+                if(typeof delta === 'string' && delta) { if(onText) onText(delta); }
+              }catch(_e){ /* ignore parse */ }
+            }
+          }
+          return { ok: true };
+        }catch(err){ if(mockMode === 'fallback' && mockData !== undefined){ if(onText && typeof mockData.text === 'string') onText(String(mockData.text)); return { ok:true, mocked:true }; } throw err; }
+      }
+    }
+
+    // Autodetección: si no viene provider pero hay credenciales AOAI válidas en el perfil/variables, usa Azure OpenAI directo.
+    function hasAoaiCreds(){
+      console.log('[hasAoaiCreds] Verificando disponibilidad de credenciales...');
+      try{
+        let activeProfile = (state && state._active_profile)
+          ? state._active_profile
+          : (window.SIM_PROFILES && typeof window.SIM_PROFILES.getActiveProfile === 'function'
+              ? (window.SIM_PROFILES.getActiveProfile() || null)
+              : null);
+        // Fallback adicional: leer de localStorage si aún no tenemos nombre activo
+        try{
+          if(!activeProfile && typeof localStorage !== 'undefined'){
+            const ap = localStorage.getItem('sim.active_profile');
+            if(ap && ap.trim()) activeProfile = ap.trim();
+          }
+        }catch(_e){}
+        if(!activeProfile) activeProfile = 'default';
+        
+        console.log('[hasAoaiCreds] Perfil activo:', activeProfile);
+        
+        let profiles = {};
+        // Siempre leer desde localStorage para garantizar sincronización
+        try{
+          const raw = localStorage.getItem('sim.profiles.v1');
+          if(raw){ 
+            const obj = JSON.parse(raw); 
+            if(obj && obj.profiles) {
+              profiles = obj.profiles;
+              // Sincronizar con memoria
+              window.SIM_CREDENTIAL_PROFILES = profiles;
+              console.log('[hasAoaiCreds] Perfiles desde localStorage:', Object.keys(profiles));
+            }
+          }
+        }catch(_e){ 
+          // Fallback a memoria si existe
+          if(typeof window !== 'undefined' && window.SIM_CREDENTIAL_PROFILES) {
+            profiles = window.SIM_CREDENTIAL_PROFILES;
+            console.log('[hasAoaiCreds] Usando perfiles desde memoria (fallback):', Object.keys(profiles));
+          }
+        }
+        
+        const base = (profiles && profiles[activeProfile]) || {};
+        console.log('[hasAoaiCreds] Perfil encontrado:', base ? 'sí' : 'no');
+        
+        // Solo usar variables del estado si tienen valores, no sobrescribir con undefined
+        const cred = {
+          aoai_endpoint: (state && state.variables && state.variables.aoai_endpoint) || base.aoai_endpoint,
+          aoai_api_key: (state && state.variables && state.variables.aoai_api_key) || base.aoai_api_key,
+          aoai_api_version: (state && state.variables && state.variables.aoai_api_version) || base.aoai_api_version,
+          aoai_chat_deployment: (state && state.variables && state.variables.aoai_chat_deployment) || base.aoai_chat_deployment
+        };
+        
+        const endpoint = String(cred.aoai_endpoint || '').trim();
+        const apiKey = String(cred.aoai_api_key || '').trim();
+        const deployment = String(cred.aoai_chat_deployment || model.deployment || '').trim();
+        
+        const result = !!(endpoint && apiKey && deployment);
+        console.log('[hasAoaiCreds] Resultado:', result, '(endpoint:', !!endpoint, ', apiKey:', !!apiKey, ', deployment:', !!deployment, ')');
+        
+        return result;
+      }catch(_e){ return false; }
+    }
+
+    // Validar soporte de perfiles en modo directo
+    const canUseDirectAoai = (agentProfile === 'normal' || agentProfile === 'domain_expert' || agentProfile === 'rag' || !agentProfile);
+    const requiresBackend = (agentProfile === 'coordinator' || agentProfile === 'retrieval');
+    
+    if(requiresBackend){
+      console.log('[Simulador] ⚠️ Perfil', agentProfile, 'NO soportado en modo directo (requiere backend para orchestration)');
+      if(onText) onText(`⚠️ El perfil "${agentProfile}" requiere el backend para funcionar correctamente.\n\nEste perfil utiliza capacidades avanzadas (orquestación multi-agente, tools personalizados) que no están disponibles en el modo directo de Azure OpenAI.\n\n✅ Para probar este perfil, asegúrate de que el backend esté ejecutándose en: ${getAgentApiBase()}`);
+      return { ok: false, error: `Perfil ${agentProfile} no soportado en modo directo`, requiresBackend: true };
+    }
+    
+    if(canUseDirectAoai && (provider === 'azure-openai' || (!provider && hasAoaiCreds()))){
+      console.log('[Simulador] Usando Azure OpenAI directo (perfil:', agentProfile, ')');
+      return await callAzureOpenAI();
+    }
+
+    // 3) Fallback a backend (modo legado) si no hay proveedor directo
     const base = getAgentApiBase();
     const body = buildAgentRequestFromNode(node);
-    const wantsStream = !!(node.stream || node.props?.stream);
     const url = (base.replace(/\/$/, '')) + '/api/chat';
-    const headers = {
-      'Content-Type': 'application/vnd.agent+json',
-      'Accept': wantsStream ? 'text/event-stream' : 'application/json'
-    };
+    const headers = { 'Content-Type': 'application/vnd.agent+json', 'Accept': wantsStream ? 'text/event-stream' : 'application/json' };
     if(!wantsStream){
+      try{
+        const res = await fetch(url, { method:'POST', headers, body: JSON.stringify(body) });
+        if(!res.ok){ try{ setAgentApiLastStatus(base, false); }catch(_e){}; const t = await res.text().catch(()=> ''); throw new Error(`HTTP ${res.status} ${t||''}`.trim()); }
+        try{ setAgentApiLastStatus(base, true); }catch(_e){}
+        return await res.json();
+      }catch(err){ if(mockMode === 'fallback' && mockData !== undefined){ return { text: (mockData && mockData.text) || '(mock agent)', citations: mockData?.citations||null, usage: mockData?.usage||null, threadId: mockData?.threadId||null, mocked:true }; } throw err; }
+    }
+    try{
       const res = await fetch(url, { method:'POST', headers, body: JSON.stringify(body) });
-      const ok = res.ok;
-      const status = res.status;
-      if(!ok){
-        try{ setAgentApiLastStatus(base, false); }catch(_e){}
-        const t = await res.text().catch(()=> '');
-        throw new Error(`HTTP ${status} ${t||''}`.trim());
-      }
+      if(!res.ok || !res.body){ try{ setAgentApiLastStatus(base, false); }catch(_e){}; throw new Error(`HTTP ${res.status}`); }
       try{ setAgentApiLastStatus(base, true); }catch(_e){}
-      return await res.json();
-    }
-    // Streaming SSE
-    const res = await fetch(url, { method:'POST', headers, body: JSON.stringify(body) });
-    if(!res.ok || !res.body){ try{ setAgentApiLastStatus(base, false); }catch(_e){}; throw new Error(`HTTP ${res.status}`); }
-    try{ setAgentApiLastStatus(base, true); }catch(_e){}
-    const reader = res.body.getReader();
-    const dec = new TextDecoder();
-    let buffer = '';
-    let done = false;
-    while(!done){
-      const { value, done: d } = await reader.read();
-      done = d;
-      if(value){ buffer += dec.decode(value, { stream: true }); }
-      let idx;
-      while((idx = buffer.indexOf('\n\n')) !== -1){
-        const chunk = buffer.slice(0, idx).trim();
-        buffer = buffer.slice(idx + 2);
-        if(!chunk.startsWith('data:')) continue;
-        const jsonText = chunk.replace(/^data:\s*/, '');
-        try{
-          const ev = JSON.parse(jsonText);
-          if(ev.type === 'meta' && onMeta) onMeta(ev);
-          else if(ev.type === 'tool' && onTool) onTool(ev);
-          else if(ev.type === 'text' && onText) onText(ev.text || '');
-        }catch(_e){ /* ignore parse */ }
+      const reader = res.body.getReader();
+      const dec = new TextDecoder();
+      let buffer = '';
+      let done = false;
+      while(!done){
+        const { value, done: d } = await reader.read();
+        done = d;
+        if(value){ buffer += dec.decode(value, { stream: true }); }
+        let idx;
+        while((idx = buffer.indexOf('\n\n')) !== -1){
+          const chunk = buffer.slice(0, idx).trim();
+          buffer = buffer.slice(idx + 2);
+          if(!chunk.startsWith('data:')) continue;
+          const jsonText = chunk.replace(/^data:\s*/, '');
+          try{
+            const ev = JSON.parse(jsonText);
+            if(ev.type === 'meta' && onMeta) onMeta(ev);
+            else if(ev.type === 'tool' && onTool) onTool(ev);
+            else if(ev.type === 'text' && onText) onText(ev.text || '');
+          }catch(_e){ /* ignore parse */ }
+        }
       }
-    }
-    return { ok: true };
+      return { ok: true };
+    }catch(err){ if(mockMode === 'fallback' && mockData !== undefined){ if(onText && typeof mockData.text === 'string') onText(String(mockData.text)); return { ok:true, mocked:true }; } throw err; }
   }
 
   // Multi‑flujo (básico): mapa de flujos disponibles y flujo actual
@@ -447,8 +773,20 @@
     const rawUrl = props.url || node.url || '';
     // Permitir {{variables}} en la URL usando el estado actual del simulador
     const url = typeof rawUrl === 'string' ? interpolate(rawUrl) : String(rawUrl || '');
+    // Base URL/headers desde configuración local
+    const cfg = (typeof window !== 'undefined' && window.SIM_LOCAL_CONFIG) ? (window.SIM_LOCAL_CONFIG.rest || {}) : {};
+    let finalUrl = url;
+    try{
+      const abs = /^https?:\/\//i.test(url);
+      if(!abs && cfg.base_url){ finalUrl = String(cfg.base_url).replace(/\/$/,'') + '/' + String(url).replace(/^\//,''); }
+    }catch(_e){}
     // Unir headers desde properties o nivel superior
     const headers = Object.assign({}, props.headers || {}, node.headers || {});
+    try{
+      if(cfg && cfg.default_headers && typeof cfg.default_headers === 'object'){
+        Object.keys(cfg.default_headers).forEach(k=>{ const exists = headers[k] !== undefined || headers[String(k).toLowerCase()] !== undefined; if(!exists) headers[k] = cfg.default_headers[k]; });
+      }
+    }catch(_e){}
     // Cuerpo opcional para métodos con payload
     let body = props.body !== undefined ? props.body : (node.body !== undefined ? node.body : undefined);
     let fetchInit = { method, headers };
@@ -468,7 +806,7 @@
     }
 
     try {
-      const response = await fetch(url, fetchInit);
+      const response = await fetch(finalUrl, fetchInit);
       const status = response.status;
       let data = null;
       if (response.ok) {
@@ -1092,7 +1430,21 @@
   function getOptionLabel(opt){
     const locale = getLocale();
     if(!opt) return '';
-    if (typeof opt.label === 'string' && opt.label.trim()) return interpolate(opt.label);
+    // 1) Si label es string, puede ser texto plano o JSON con i18n → intentar resolver
+    if (typeof opt.label === 'string' && opt.label.trim()){
+      const s = opt.label.trim();
+      const resolved = tryResolveLabelFromJsonOrRaw(s, locale);
+      return interpolate(resolved || s);
+    }
+    // 2) Si label es objeto, soportar { i18n:{ es:"..", en:".." }, default:".." } o { es:"..", en:".." }
+    if (opt.label && typeof opt.label === 'object'){
+      try{
+        const obj = opt.label;
+        const map = (obj && obj.i18n && typeof obj.i18n === 'object') ? obj.i18n : obj;
+        const txt = map[locale] || map.es || map.en || map.pt || obj.default || '';
+        if (txt) return interpolate(String(txt));
+      }catch(_e){}
+    }
     const i18n = opt.i18n || {};
     const getText = (loc) => {
       try{
@@ -1104,6 +1456,27 @@
     };
     const txt = getText(locale) || getText('es') || getText('en') || getText('pt');
     return interpolate(txt || opt.text || '');
+  }
+
+  // Resolver etiqueta a partir de string JSON u objeto con i18n; si no, devuelve el raw
+  function tryResolveLabelFromJsonOrRaw(labelOrJson, locale){
+    if(!labelOrJson) return labelOrJson;
+    try{
+      // Si ya es objeto, reutilizar
+      if (typeof labelOrJson === 'object'){
+        const obj = labelOrJson;
+        const map = (obj && obj.i18n && typeof obj.i18n === 'object') ? obj.i18n : obj;
+        return map[locale] || map.es || obj.default || Object.values(map).find(v=>typeof v==='string' && v.trim()) || '';
+      }
+      const s = String(labelOrJson).trim();
+      if (!s.startsWith('{')) return s;
+      const parsed = JSON.parse(s);
+      if (parsed && typeof parsed === 'object'){
+        const map = (parsed.i18n && typeof parsed.i18n === 'object') ? parsed.i18n : parsed;
+        return map[locale] || map.es || parsed.default || Object.values(map).find(v=>typeof v==='string' && String(v).trim()) || s;
+      }
+    }catch(_e){}
+    return labelOrJson;
   }
 
   // Lee y parsea el valor del campo JSON extra (simExtraInput) de manera tolerante
@@ -1215,10 +1588,23 @@
       } catch(_e) {}
     }
     const __clearEphemerals = () => {
-      if (__extraInjected) {
-        try { delete state.variables.extra; console.debug('[Simulador] extra cleared after step'); } catch(_e) { /* ignore */ }
-        __extraInjected = false;
-      }
+      // Manejo de extra efímero cuando viene del nodo extra: respetar TTL
+      try{
+        if (state && state.variables && state.variables.__extra_meta && state.variables.__extra_meta.origin === 'extra_node'){
+          if (__extraTtl > 0) {
+            __extraTtl--; // consumir un paso más sin limpiar
+          } else {
+            delete state.variables.extra;
+            delete state.variables.__extra_meta;
+            console.debug('[Simulador] extra (from extra_node) cleared after deferred step');
+          }
+        } else if (__extraInjected) {
+          // Inyección manual desde el panel efímero del simulador
+          delete state.variables.extra;
+          console.debug('[Simulador] extra cleared after step (injected)');
+          __extraInjected = false;
+        }
+      }catch(_e){ /* ignore */ }
       if (__turnInjected) {
         try { delete state.variables.turn; delete state.variables.$turn; console.debug('[Simulador] turn cleared after step'); } catch(_e) { /* ignore */ }
         __turnInjected = false;
@@ -1449,6 +1835,59 @@
           state.current = gotoNext(node.next);
         }
         break; }
+      case 'extra': {
+        // Renderizar un selector de archivo y esperar a que el usuario suba un fichero.
+        // El contenido se inyectará en state.variables.extra y quedará disponible para el siguiente paso.
+        const panel = $('simulatorCanvasPreview'); if(!panel) { state.current = gotoNext(node.next); break; }
+        panel.innerHTML = '';
+        const title = document.createElement('div'); title.className = 'font-semibold'; title.textContent = 'Sube un archivo (nodo extra)'; panel.appendChild(title);
+        const input = document.createElement('input'); input.type = 'file'; input.className = 'mt-2'; panel.appendChild(input);
+        const hint = document.createElement('div'); hint.className = 'text-xs text-gray-600 mt-1'; hint.textContent = 'El contenido se almacenará en la variable efímera "extra" para el siguiente paso.'; panel.appendChild(hint);
+        const status = document.createElement('div'); status.className = 'text-xs text-gray-700 mt-2'; panel.appendChild(status);
+
+        function readFilePayload(file){
+          return new Promise((resolve,reject)=>{
+            try{
+              const isText = /^text\//.test(file.type) || /\.(json|txt|csv|md|xml|html?)$/i.test(file.name) || /json$/.test(file.type);
+              const reader = new FileReader();
+              reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+              reader.onload = () => {
+                try{
+                  if(isText){
+                    resolve({ filename: file.name, mimetype: file.type || 'application/octet-stream', size: file.size, encoding: 'utf8', content: String(reader.result || '') });
+                  } else {
+                    const dataUrl = String(reader.result || '');
+                    const base64 = dataUrl.split(',')[1] || '';
+                    resolve({ filename: file.name, mimetype: file.type || 'application/octet-stream', size: file.size, encoding: 'base64', content: base64 });
+                  }
+                }catch(e){ reject(e); }
+              };
+              if(isText) reader.readAsText(file); else reader.readAsDataURL(file);
+            }catch(e){ reject(e); }
+          });
+        }
+
+        input.addEventListener('change', async ()=>{
+          const f = input.files && input.files[0]; if(!f){ status.textContent = 'Ningún archivo seleccionado.'; return; }
+          status.textContent = 'Leyendo archivo…';
+          try{
+            const payload = await readFilePayload(f);
+            const __prev = deepClone(state && state.variables ? state.variables : {});
+            state.variables.extra = payload;
+            state.variables.__extra_meta = { origin: 'extra_node' };
+            __extraTtl = 1; // mantener durante el siguiente paso
+            status.textContent = `Cargado: ${payload.filename} (${payload.mimetype}, ${payload.size} bytes)`;
+            maybeAppendDiff(__prev);
+            state.history.push({ node: nodeId, type: 'extra', filename: payload.filename, size: payload.size, mimetype: payload.mimetype });
+            state.current = gotoNext(node.next);
+            renderPreview(); renderVariables();
+            if (running) stepTimeout = setTimeout(step, fastMode ? 0 : 200);
+          }catch(err){ status.textContent = 'Error leyendo archivo: ' + (err && err.message ? err.message : String(err)); }
+        });
+        // Pausar ejecución a la espera de selección del usuario
+        __clearEphemerals();
+        return;
+      }
       case 'condition': {
         const expr = node.expr || node.expression || node.value || '';
         try{ console.log('[Simulador] about to evaluate condition:', expr, 'state.variables snapshot:', JSON.stringify(state.variables)); }catch(_e){}
@@ -1517,9 +1956,19 @@
         // Guardar credenciales en memoria simulador (sim-only)
         const profileName = node.profile || node.props?.profile || 'sim';
         const creds = node.credentials || node.props?.credentials || {};
+        const persist = (node.persist === true) || (node.props?.persist === true) || (node.props?.persist_to_localstorage === true);
+        const activate = (node.activate === true) || (node.props?.activate === true);
         if (!window.SIM_CREDENTIAL_PROFILES) window.SIM_CREDENTIAL_PROFILES = {};
         window.SIM_CREDENTIAL_PROFILES[profileName] = creds;
-        log(`CREDENTIAL_PROFILE (sim-only) -> perfil ${profileName} guardado en memoria`);
+        try {
+          if (persist && window.SIM_PROFILES && typeof window.SIM_PROFILES.saveSimProfiles === 'function') {
+            window.SIM_PROFILES.saveSimProfiles(window.SIM_CREDENTIAL_PROFILES);
+          }
+          if (activate && window.SIM_PROFILES && typeof window.SIM_PROFILES.setActiveProfile === 'function') {
+            window.SIM_PROFILES.setActiveProfile(profileName);
+          }
+        } catch(e) { console.warn('Persistencia/activación de perfil falló', e); }
+        log(`CREDENTIAL_PROFILE (sim-only) -> perfil ${profileName} guardado en ${persist ? 'localStorage y memoria' : 'memoria'}`);
         state.current = gotoNext(node.next);
         break; }
       default: {
@@ -1650,9 +2099,10 @@
 
           buttons = sourceList.map((item, i) => {
             try {
-              const label = evalInScope(labelExpr, item, i);
+              const labelRaw = evalInScope(labelExpr, item, i);
               const value = evalInScope(valueExpr, item, i);
-              return { label: String(label), value: value, index: i };
+              const finalLabel = tryResolveLabelFromJsonOrRaw(labelRaw, getLocale()) || labelRaw;
+              return { label: String(finalLabel), value: value, index: i };
             } catch (e) {
               log(`Error evaluating button ${i}: ${e.message}`);
               return { label: `Opción ${i+1}`, value: item, index: i };
@@ -1730,8 +2180,8 @@
     let items = [];
     const provider = node.provider || {};
     const srcExpr = node.src || node.source_list || provider.source_list || null;
-    const labelExpr = node.labelExpr || node.label_expr || provider.label_expr || 'item.label || item.name || item';
-    const valueExpr = node.valueExpr || node.value_expr || provider.value_expr || 'item.value || item.name || item';
+  const labelExpr = node.labelExpr || node.label_expr || provider.label_expr || 'item.label || item.name || item';
+  const valueExpr = node.valueExpr || node.value_expr || provider.value_expr || 'item.value || item.name || item';
 
     const evalInScope = (expr, item, index) => {
       try {
@@ -1775,7 +2225,8 @@
             });
           }
           items = filtered.map((it, i)=>{
-            let lbl = evalInScope(labelExpr, it, i); if(lbl === undefined || lbl === null) lbl = `Opción ${i+1}`;
+            let lblRaw = evalInScope(labelExpr, it, i); if(lblRaw === undefined || lblRaw === null) lblRaw = `Opción ${i+1}`;
+            const lbl = tryResolveLabelFromJsonOrRaw(lblRaw, getLocale()) || lblRaw;
             const val = evalInScope(valueExpr, it, i);
             return { label: String(lbl), value: (val !== undefined && val !== null) ? val : String(lbl) };
           });
@@ -1783,10 +2234,13 @@
       }catch(e){ /* si falla, cae a estáticas */ }
     }
     if (!Array.isArray(items) || items.length === 0){
-      items = (Array.isArray(node.options) ? node.options : []).map((o,i)=>({
-        label: getOptionLabel(o) || `Opción ${i+1}`,
-        value: (o && (o.value !== undefined)) ? o.value : (getOptionLabel(o) || `Opción ${i+1}`)
-      }));
+      items = (Array.isArray(node.options) ? node.options : []).map((o,i)=>{
+        const lbl = getOptionLabel(o) || `Opción ${i+1}`;
+        return {
+          label: lbl,
+          value: (o && (o.value !== undefined)) ? o.value : lbl
+        };
+      });
     }
 
     // Preselección desde variable save_as si existe
@@ -2303,11 +2757,76 @@
     console.log('presentCurrentNodeInChat called, state:', !!state, 'flow:', !!flow);
     if(!state || !flow){ console.warn('Sin estado o flujo'); return; }
     if(!state.current && flow._start){ console.log('state.current vacío, asignando start'); state.current = flow._start; }
+    // Limpieza/gestión de efímeros en modo chat: respetar TTL del "extra" proveniente de nodo extra
+    try{
+      if(state.variables && state.variables.__extra_meta && state.variables.__extra_meta.origin === 'extra_node'){
+        if (__extraTtl > 0){
+          __extraTtl--; // consumir un ciclo sin limpiar
+        } else {
+          delete state.variables.extra;
+          delete state.variables.__extra_meta;
+          console.debug('[Simulador] extra (from extra_node) cleared in chat after deferred step');
+        }
+      }
+    }catch(_e){}
     const nodeId = state.current; console.log('nodeId:', nodeId); if(!nodeId){ appendChatMessage('bot','(fin del flujo)'); return; }
     const node = flow._nodes[nodeId]; if(!node){ appendChatMessage('bot',`Nodo ${nodeId} no encontrado`); return; }
     // Snapshot antes de procesar el nodo para poder calcular diffs
     const __prevVars = deepClone(state && state.variables ? state.variables : {});
     switch(node.type){
+      case 'extra': {
+        // UI de subida de archivo en el chat. Al leer, inyecta en state.variables.extra y avanza.
+        const prompt = node.prompt || 'Adjunta un archivo para continuar';
+        const text = processText(prompt, looksLikeMarkdown(prompt) || !!node.render_markdown || !!node.renderMarkdown);
+        showTyping(()=>{ appendChatMessage('bot', text); 
+          const wrap = document.createElement('div'); wrap.className = 'flex flex-col gap-2 mt-2 max-w-sm';
+          const input = document.createElement('input'); input.type = 'file'; input.className = 'block';
+          const info = document.createElement('div'); info.className = 'text-xs text-gray-600'; info.textContent = 'Se guardará como variable efímera "extra" para el siguiente paso.';
+          wrap.appendChild(input); wrap.appendChild(info);
+
+          function readFilePayload(file){
+            return new Promise((resolve,reject)=>{
+              try{
+                const isText = /^text\//.test(file.type) || /\.(json|txt|csv|md|xml|html?)$/i.test(file.name) || /json$/.test(file.type);
+                const reader = new FileReader();
+                reader.onerror = () => reject(new Error('No se pudo leer el archivo'));
+                reader.onload = () => {
+                  try{
+                    if(isText){
+                      resolve({ filename: file.name, mimetype: file.type || 'application/octet-stream', size: file.size, encoding: 'utf8', content: String(reader.result || '') });
+                    } else {
+                      const dataUrl = String(reader.result || '');
+                      const base64 = dataUrl.split(',')[1] || '';
+                      resolve({ filename: file.name, mimetype: file.type || 'application/octet-stream', size: file.size, encoding: 'base64', content: base64 });
+                    }
+                  }catch(e){ reject(e); }
+                };
+                if(isText) reader.readAsText(file); else reader.readAsDataURL(file);
+              }catch(e){ reject(e); }
+            });
+          }
+
+          input.addEventListener('change', async ()=>{
+            const f = input.files && input.files[0]; if(!f) return;
+            info.textContent = 'Leyendo archivo…';
+            try{
+              const payload = await readFilePayload(f);
+              const __prev = deepClone(state && state.variables ? state.variables : {});
+              state.variables.extra = payload;
+              state.variables.__extra_meta = { origin: 'extra_node' };
+              __extraTtl = 1; // disponible para el siguiente paso del chat
+              info.textContent = `Cargado: ${payload.filename} (${payload.mimetype}, ${payload.size} bytes)`;
+              try{ appendChatMessage('bot', createSavedChip('extra', { filename: payload.filename, size: payload.size, type: payload.mimetype })); }catch(_e){}
+              maybeAppendDiff(__prev);
+              state.history.push({ node: state.current, type: 'extra', filename: payload.filename, size: payload.size, mimetype: payload.mimetype });
+              state.current = gotoNext(node.next);
+              renderPreview(); updateDebugPanels(); if(state.current) presentCurrentNodeInChat(); else appendChatMessage('bot','(fin del flujo)');
+            }catch(err){ info.textContent = 'Error leyendo archivo: ' + (err && err.message ? err.message : String(err)); }
+          });
+
+          appendChatMessage('bot', wrap);
+        });
+        break; }
       case 'agent_call': {
         const saveKey = node.save_as || null;
         const wantsStream = !!(node.stream || node.props?.stream);
@@ -3443,8 +3962,8 @@
     });
   }
 
-  // Initialize on DOM ready: hide legacy UI then bind
-  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => { hideSimulatorElementsOnLoad(); setupUiBindings(); }); else { hideSimulatorElementsOnLoad(); setupUiBindings(); }
+  // Initialize on DOM ready: load local config, hide legacy UI then bind
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', async () => { await loadLocalConfig(); hideSimulatorElementsOnLoad(); setupUiBindings(); }); else { loadLocalConfig(); hideSimulatorElementsOnLoad(); setupUiBindings(); }
 
   // expose minimal API for debug and runtime inspection
   window.Simulador = {

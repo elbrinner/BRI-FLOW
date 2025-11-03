@@ -386,6 +386,7 @@ aside.overlay-visible{display:block}
 .form-row{display:flex;flex-direction:column;margin-bottom:8px}
 .form-row label{font-size:13px;color:var(--muted);margin-bottom:4px}
 .form-row input[type="text"], .form-row textarea, .form-row select{padding:8px;border-radius:6px;border:1px solid #d7dde7}
+.form-row textarea{width:100%;}
 .form-row textarea{min-height:80px;resize:vertical}
 .form-row.actions{display:flex;gap:8px;justify-content:flex-end}
 /* JSON output panel: fixed so it doesn't make the page scroll; it has its own scrollbar */
@@ -561,7 +562,9 @@ body.compact-ui .assign-actions .remove-assignment { padding: 2px 6px !important
 body.compact-ui .add-assignment { padding-top: 4px; padding-bottom: 4px; }
 
 /* ---- assign_var layout improvements (only layout/visual, no logic) ---- */
-.assignment-row{ display:grid; grid-template-columns:minmax(140px,0.9fr) minmax(140px,0.9fr) minmax(160px,1fr) min-content; gap:6px; align-items:center; }
+.assignment-row{ display:grid; grid-template-columns: minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 88px; gap:6px; align-items:center; box-sizing:border-box; }
+.assignment-row .field-col{ min-width:0; }
+.assignment-row .assign-actions{ justify-self:end; display:inline-flex; gap:6px; min-width:88px; white-space:nowrap; }
 .assignment-row .assign-target, .assignment-row .assign-path, .assignment-row .assign-value{ min-width:0; padding:4px 6px; font-size:12px; }
 .assignment-row .assign-actions{ display:flex; align-items:center; justify-content:flex-end; gap:6px; }
 .assignment-row .field-col{ display:flex; flex-direction:column; gap:4px; }
@@ -576,7 +579,7 @@ body.compact-ui .add-assignment { padding-top: 4px; padding-bottom: 4px; }
 /* Responsive wrapping for narrow panels */
 /* En pantallas grandes recuperamos 4 columnas completas */
 @media (min-width: 1100px){
-  .assignment-row{ grid-template-columns:minmax(180px,1fr) minmax(160px,1fr) minmax(160px,1fr) auto; }
+  .assignment-row{ grid-template-columns:minmax(0,1fr) minmax(0,1fr) minmax(0,1fr) 88px; }
   .assignment-row .assign-value{ grid-column:auto; }
 }
 @media (max-width: 560px){

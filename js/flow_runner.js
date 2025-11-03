@@ -64,6 +64,7 @@
       case 'response': return await handleResponse(node, locale);
       case 'choice': return await handleChoice(node, locale);
       case 'button': return await handleButton(node, locale);
+      case 'extra': return await handleExtra(node, locale);
   case 'assign_var': return await handleAssignVar(node);
       case 'condition': return await handleCondition(node);
       case 'set_goto': return await handleSetGoto(node);
@@ -128,6 +129,33 @@
     const html = `<div><div style="font-weight:700;margin-bottom:8px">Nodo response: ${node.id}</div><div style="white-space:pre-wrap;margin-bottom:12px">${text}</div><div style="text-align:right"><button id="runnerNext">Siguiente</button></div>${contextHtml}</div>`;
     const { card } = window.FlowUI.showNodeUI(html);
     await window.FlowUI.waitForClick(card, '#runnerNext');
+    window.FlowUI.hideModal();
+    return resolveNext(node.next);
+  }
+
+  async function handleExtra(node, locale) {
+    const ctx = window.App.runtimeContext;
+    const contextHtml = `<div style="margin-top:12px;font-size:12px;color:#333">Context: <pre class='contextPreview' style='background:#f6f6f6;padding:8px;border-radius:4px;height:120px;overflow:auto'>${JSON.stringify(ctx, null, 2)}</pre></div>`;
+    const desc = (node.descripcion && String(node.descripcion).trim()) || 'Nodo Extra: el frontend enviará un payload efímero (request.extra).';
+    const html = `
+      <div>
+        <div style="font-weight:700;margin-bottom:8px">Nodo extra: ${node.id}</div>
+        <div style="margin-bottom:10px">${desc}</div>
+        <textarea id="runnerExtraInput" style="width:100%;min-height:90px;padding:8px;border:1px solid #ddd;border-radius:4px;margin-bottom:10px">{\n  \"simulado\": true\n}</textarea>
+        <div style="display:flex;justify-content:flex-end;gap:8px"><button id="runnerCancel">Omitir</button><button id="runnerOk">Enviar extra (simulado)</button></div>
+        ${contextHtml}
+        <div style="margin-top:8px;font-size:12px;color:#666">El valor se colocará en <code>context.extra</code> (solo a efectos del simulador).</div>
+      </div>`;
+    const { card } = window.FlowUI.showNodeUI(html);
+    const res = await window.FlowUI.waitForInputSubmit(card, '#runnerExtraInput', '#runnerOk', '#runnerCancel');
+    if (!res.cancelled) {
+      // intentar parsear JSON, si falla, guardar string
+      let value = res.value;
+      try { value = JSON.parse(res.value); } catch(_e) { /* keep string */ }
+      ctx.variables['extra'] = value;
+      window.FlowUI.updateContextView(card);
+      await new Promise(r => setTimeout(r, 200));
+    }
     window.FlowUI.hideModal();
     return resolveNext(node.next);
   }

@@ -376,7 +376,18 @@
         node.options = node.options.map(o => {
           // if already modern shape with i18n and next, normalize next and preserve variant
           if (o.next || (o.i18n && o.next !== undefined)) {
-            return { i18n: o.i18n || {}, next: normalizeTarget(o.next), variant: o.variant };
+            const out = { i18n: o.i18n || {}, next: normalizeTarget(o.next), variant: o.variant };
+            const explicit = (o.value !== undefined && o.value !== null) ? String(o.value) : '';
+            if (explicit.trim() !== '') out.value = explicit;
+            else {
+              // fallback to label text from i18n (default locale) or legacy label
+              const defaultLocale = (state && state.meta && Array.isArray(state.meta.locales) && state.meta.locales[0]) ? state.meta.locales[0] : 'en';
+              let lbl = '';
+              try { lbl = (o.i18n?.[defaultLocale]?.text) || ''; if (Array.isArray(lbl)) lbl = lbl[0] || ''; } catch(_e) {}
+              if (!lbl && o.label) lbl = String(o.label);
+              out.value = lbl || '';
+            }
+            return out;
           }
           // legacy shape: label + target
           const normalized = normalizeTarget(o.target || o.next);
@@ -384,7 +395,11 @@
           const i18n = {};
           const defaultLocale = (state && state.meta && Array.isArray(state.meta.locales) && state.meta.locales[0]) ? state.meta.locales[0] : 'en';
           if (o.label) i18n[defaultLocale] = { text: o.label };
-          return { i18n, next: normalized, variant: o.variant };
+          const out = { i18n, next: normalized, variant: o.variant };
+          const explicit = (o.value !== undefined && o.value !== null) ? String(o.value) : '';
+          if (explicit.trim() !== '') out.value = explicit;
+          else out.value = o.label || '';
+          return out;
         });
       }
       if (node.true_target) node.true_target = normalizeTarget(node.true_target);

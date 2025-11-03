@@ -13,6 +13,9 @@
       case 'start':
         base.variables = base.variables || [];
         break;
+      case 'extra':
+        // Nodo minimalista: solo usa next y descripcion; sin props especiales
+        break;
       case 'end':
         // no special props
         break;
