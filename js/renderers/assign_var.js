@@ -111,11 +111,30 @@
         opt.dataset.originFlow = ent.flowId || '';
         selTarget.appendChild(opt);
       }
+      // Opción para escribir manualmente (ej: item, data_flow.Lista[{{index}}])
+      selTarget.appendChild(el('option',{value:'__manual__',text:'⭧ Escribir manualmente…'}));
+      const manualRoot = el('input',{type:'text', class:'assign-root-manual border rounded px-2 py-1 text-sm w-full min-w-0', placeholder:'Variable raíz (ej: item, data_flow)'});
+      manualRoot.style.display = 'none';
       // path
       const pathInp = el('input',{type:'text',class:'assign-path border rounded px-2 py-1 text-sm w-full min-w-0',placeholder:'Propiedad (ej: persona.nombre)','aria-label':'Propiedad (objeto)'});
       // init select+path from a.target
-  if (a?.target?.includes('.')){ const parts=a.target.split('.'); selTarget.value = parts[0]; pathInp.value = parts.slice(1).join('.'); }
-  else if (a?.target) { selTarget.value = a.target; }
+      (function initFromTarget(){
+        const tgt = a?.target || '';
+        if (!tgt) return;
+        if (tgt.includes('.')){
+          const parts = tgt.split('.');
+          const root = parts[0];
+          const rest = parts.slice(1).join('.');
+          // si root no está en la lista, activar modo manual
+          const hasOpt = Array.from(selTarget.options).some(o => o.value === root);
+          if (hasOpt){ selTarget.value = root; }
+          else { selTarget.value = '__manual__'; manualRoot.style.display=''; manualRoot.value = root; }
+          pathInp.value = rest;
+        } else {
+          const hasOpt = Array.from(selTarget.options).some(o => o.value === tgt);
+          if (hasOpt) selTarget.value = tgt; else { selTarget.value = '__manual__'; manualRoot.style.display=''; manualRoot.value = tgt; }
+        }
+      })();
   // value
   const valueAttrs = { type:'text', class:'assign-value border rounded px-2 py-1 text-sm w-full min-w-0', placeholder:'Valor ("texto" | 123 | context.varX | {{expresion}})', value: a.value || '', 'aria-label':'Valor' };
   const valueInp = el('input', valueAttrs);
@@ -132,7 +151,8 @@
       // columnas con etiqueta visible
       const colTarget = el('div',{class:'field-col'},[
         el('span',{class:'field-label', text:'Variable'}),
-        selTarget
+        selTarget,
+        manualRoot
       ]);
       const colPath = el('div',{class:'field-col'},[
         el('span',{class:'field-label', text:'Propiedad (objeto)'}),
@@ -151,16 +171,22 @@
       row.appendChild(actions);
 
       // si la variable seleccionada no es objeto, ocultar path + explorer
+      function currentRoot(){ return (selTarget.value === '__manual__') ? (manualRoot.value||'').trim() : selTarget.value; }
+      function updateManualUI(){ manualRoot.style.display = (selTarget.value === '__manual__') ? '' : 'none'; }
       function updateVisibility(){
-        const isObj = !!selTarget.value && isObjectVar(selTarget.value);
-        // Mantener visibles siempre, pero deshabilitar si no aplica
+        const root = currentRoot();
+        const isManual = (selTarget.value === '__manual__');
+        const isObj = isManual ? true : (!!root && isObjectVar(root));
+        // habilitar path cuando root es manual o la var raíz es objeto
         pathInp.disabled = !isObj;
-        explorerBtn.disabled = !isObj;
+        explorerBtn.disabled = !(!isManual && isObj); // deshabilitar explorer si es manual
         pathInp.placeholder = isObj ? 'Propiedad (ej: persona.nombre)' : '— no aplica —';
         if (!isObj) pathInp.value = '';
+        updateManualUI();
       }
       updateVisibility();
       selTarget.addEventListener('change', updateVisibility);
+      manualRoot.addEventListener('input', updateVisibility);
 
       return row;
     }
@@ -190,9 +216,10 @@
       const assigns = [];
       for (const row of rows){
         const sel = row.querySelector('.assign-target');
+        const manual = row.querySelector('.assign-root-manual');
         const path = row.querySelector('.assign-path');
         const val = row.querySelector('.assign-value');
-        const root = sel?.value || '';
+        const root = (sel?.value === '__manual__') ? (manual?.value || '') : (sel?.value || '');
         const sub = (path?.value||'').trim();
         let target = '';
         if (root){ target = sub ? (root + '.' + sub) : root; }
