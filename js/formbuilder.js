@@ -690,9 +690,83 @@ const FormBuilder = (() => {
   // multi_button comparte casi toda la UI con button (renderer reutilizado),
   // pero puede añadir campos específicos (min/max/defaults) si el renderer los renderiza.
   function readMultiButton(container) {
-    // Reutilizar lectura base del botón
-    const base = readButton(container) || {};
-    // Campos adicionales opcionales (si existen en el DOM)
+    // En vez de reutilizar totalmente readButton (que busca `.button-item` y campos i18n_text_*),
+    // leemos del panel dedicado (ids mb_*) y preservamos las opciones ya presentes en el nodo.
+    const out = {};
+
+    // Prompt por locales (panel usa #i18n_prompt_<loc>)
+    const locales = (window.App?.state?.meta?.locales?.length) ? window.App.state.meta.locales : ['es'];
+    const i18n = {};
+    let anyPrompt = false;
+    locales.forEach(loc => {
+      const el = container.querySelector('#i18n_prompt_' + loc);
+      if (el) {
+        i18n[loc] = { prompt: el.value || '' };
+        anyPrompt = true;
+      }
+    });
+    if (anyPrompt) out.i18n = i18n;
+
+    // save_as desde el panel (fallback a sugerencia por id de nodo)
+    let save_as = (container.querySelector('#mb_save_as input, #mb_save_as')?.value || '').trim();
+    if (!save_as) {
+      const nid = window.App?.state?.selectedNodeId || window.App?.state?.editingNode?.id || null;
+      if (nid) save_as = `selected_multi_${nid}`;
+    }
+    if (save_as) out.save_as = save_as;
+
+    // modo (static | dynamic)
+    const mode = container.querySelector('#mb_mode')?.value || 'static';
+    out.mode = mode;
+
+    // proveedor sólo en dinámico (panel ids: mb_source/mb_label/mb_value/mb_filter/mb_sort)
+    if (mode === 'dynamic') {
+      out.provider = {
+        source_list: (container.querySelector('#mb_source input, #mb_source')?.value || '').trim(),
+        label_expr: (container.querySelector('#mb_label input, #mb_label')?.value || '').trim(),
+        value_expr: (container.querySelector('#mb_value input, #mb_value')?.value || '').trim(),
+        filter_expr: (container.querySelector('#mb_filter input, #mb_filter')?.value || '').trim(),
+        sort_expr: (container.querySelector('#mb_sort input, #mb_sort')?.value || '').trim()
+      };
+      // En dinámico, no exportamos opciones estáticas
+      out.options = [];
+    } else {
+      // En estático, intentar leer filas `.mb-item`; si no, preservar las del nodo actual
+      const rows = container.querySelectorAll('.mb-item');
+      const options = [];
+      rows.forEach(row => {
+        const lbl = row.querySelector('[id^="mb_lbl_"] input, [id^="mb_lbl_"]')?.value || '';
+        const val = row.querySelector('[id^="mb_val_"] input, [id^="mb_val_"]')?.value || '';
+        const variantSel = row.querySelector('select[id^="mb_var_"]');
+        const variant = variantSel ? (variantSel.value || '') : '';
+        const tgtFlowSel = row.querySelector('select[id^="mb_tgt_flow_"]');
+        const tgtNodeSel = row.querySelector('select[id^="mb_tgt_"]:not([id^="mb_tgt_flow_"])');
+        const flow_id = tgtFlowSel?.value || '';
+        const node_id = tgtNodeSel?.value || '';
+        const target = (flow_id || node_id) ? { flow_id, node_id } : null;
+        // Sólo añadir si hay algo relevante
+        if ((lbl && lbl.trim()) || (val && val.trim()) || target) {
+          const opt = { label: lbl || '', target };
+          if (variant) opt.variant = variant;
+          if (String(val || '').trim() !== '') opt.value = val;
+          options.push(opt);
+        }
+      });
+      if (options.length) {
+        out.options = options;
+      } else {
+        // Preservar si el renderer ya escribió en el nodo actual
+        try {
+          const sid = window.App?.state?.selectedNodeId;
+          const current = (sid && window.App?.state?.nodes?.[sid]) ? window.App.state.nodes[sid] : null;
+          if (current && Array.isArray(current.options)) {
+            out.options = JSON.parse(JSON.stringify(current.options));
+          }
+        } catch(e) { /* noop */ }
+      }
+    }
+
+    // Campos adicionales opcionales (min/max/defaults) desde el panel
     const minRaw = container.querySelector('#mb_min input, #mb_min')?.value || '';
     const maxRaw = container.querySelector('#mb_max input, #mb_max')?.value || '';
     const defsRaw = container.querySelector('#mb_defaults input, #mb_defaults')?.value || '';
@@ -702,10 +776,11 @@ const FormBuilder = (() => {
       .split(',')
       .map(s => s.trim())
       .filter(Boolean);
-    if (Number.isFinite(min)) base.min_selected = min;
-    if (Number.isFinite(max)) base.max_selected = max;
-    if (default_values.length) base.default_values = default_values;
-    return base;
+    if (Number.isFinite(min)) out.min_selected = min;
+    if (Number.isFinite(max)) out.max_selected = max;
+    if (default_values.length) out.default_values = default_values;
+
+    return out;
   }
 
 
