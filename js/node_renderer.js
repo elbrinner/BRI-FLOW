@@ -4,6 +4,7 @@
   const nodeStyles = {
     start: { color: '#2b7cff', bg: 'linear-gradient(90deg,#eef6ff,#fff)', icon: '🚀', label: 'Inicio' },
     response: { color: '#10b981', bg: 'linear-gradient(90deg,#f0fdf4,#fff)', icon: '💬', label: 'Respuesta' },
+    hidden_response: { color: '#6b7280', bg: 'linear-gradient(90deg,#f9fafb,#fff)', icon: '👻', label: 'Hidden Response' },
     input: { color: '#f59e0b', bg: 'linear-gradient(90deg,#fffbeb,#fff)', icon: '⌨️', label: 'Entrada' },
     assign_var: { color: '#8b5cf6', bg: 'linear-gradient(90deg,#faf5ff,#fff)', icon: '🔧', label: 'Asignar Variable' },
     button: { color: '#f59e0b', bg: 'linear-gradient(90deg,#fffaf0,#fff)', icon: '🔘', label: 'Botón' },

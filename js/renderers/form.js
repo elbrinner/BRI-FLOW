@@ -1,4 +1,4 @@
-// form.js - renderer form (UI v2 con soporte i18n para label/placeholder, tipos y select con opciones)
+// form.js - renderer form (UI v2 con soporte i18n para label/placeholder, tipos y select con opciones, y modo dinámico)
 (function(){
   const { adoptTemplate, setupValidation, markFieldUsed } = window.RendererHelpers || {};
   const H = window.FormBuilderHelpers || {};
@@ -35,16 +35,47 @@
   function renderForm(node, container){
     container = adoptTemplate(container,'form','form-form-slot');
     node.fields = Array.isArray(node.fields) ? node.fields.map(coerceField) : [];
+    node.provider = node.provider || {};
 
     const title = el('div',{className:'text-sm font-semibold text-gray-700 mb-1', text:'Campos del formulario'});
     container.appendChild(title);
 
-    const editorRow = el('div',{className:'form-row'});
+    // Mode selector
+    const modeRow = el('div',{className:'form-row flex items-center gap-2'});
+    const modeLbl = el('label',{text:'Modo'});
+    modeRow.appendChild(modeLbl);
+    const modeSel = el('select',{id:'form_mode'});
+    ['static','dynamic'].forEach(m=>{
+      const opt = el('option',{value:m,text:m});
+      if ((node.mode || 'static') === m) opt.selected = true;
+      modeSel.appendChild(opt);
+    });
+    modeRow.appendChild(modeSel);
+    container.appendChild(modeRow);
+
+    const editorRow = el('div',{class:'form-row'});
     const list = el('div',{id:'form_fields_container', className:'fields-v2'});
     editorRow.appendChild(list);
     const addBtn = el('button',{type:'button', text:'Añadir campo', className:'mt-2 px-3 py-1 bg-blue-600 text-white rounded text-sm'});
     editorRow.appendChild(addBtn);
     container.appendChild(editorRow);
+
+    // Provider section (dynamic mode)
+    const providerWrap = el('div',{id:'form_provider_wrap',class:'provider-wrap border rounded p-2 mb-2 bg-white/70',style:'display:none;'});
+    providerWrap.appendChild(el('div',{class:'text-xs font-semibold text-gray-700 mb-1',text:'Datos dinámicos'}));
+    providerWrap.appendChild(inputRow({label:'Lista (source_list)',id:'form_source_list',value:node.provider?.source_list || '',placeholder:'itemvc_view.CatalogueSections.UseCaseSpecific.Fields'}));
+    providerWrap.appendChild(inputRow({label:'Filtro (filter_expr)',id:'form_filter_expr',value:node.provider?.filter_expr || '',placeholder:'item.activo'}));
+    providerWrap.appendChild(inputRow({label:'Orden (sort_expr)',id:'form_sort_expr',value:node.provider?.sort_expr || '',placeholder:'item.orden'}));
+    container.appendChild(providerWrap);
+
+    function toggleVisibility(){
+      const mode = modeSel.value;
+      providerWrap.style.display = mode === 'dynamic' ? 'block' : 'none';
+      editorRow.style.display = mode === 'static' ? 'block' : 'none';
+      runValidation();
+    }
+    modeSel.addEventListener('change', toggleVisibility);
+    toggleVisibility();
 
     function createTypeSelect(f){
       const sel = el('select');
@@ -174,23 +205,54 @@
     // El lector busca getValue en la fila .form-row; encaminar a nuestro getValue
     editorRow.getValue = () => rowEl.getValue();
 
+    // Para provider
+    const providerRow = providerWrap;
+    providerRow.getValue = () => {
+      const src = container.querySelector('#form_source_list input, #form_source_list')?.value?.trim() || '';
+      const filter = container.querySelector('#form_filter_expr input, #form_filter_expr')?.value?.trim() || '';
+      const sort = container.querySelector('#form_sort_expr input, #form_sort_expr')?.value?.trim() || '';
+      const prov = {};
+      if (src) prov.source_list = src;
+      if (filter) prov.filter_expr = filter;
+      if (sort) prov.sort_expr = sort;
+      return Object.keys(prov).length > 0 ? prov : null;
+    };
+
+    // Main getValue for the container
+    container.getValue = () => {
+      const mode = container.querySelector('#form_mode')?.value || 'static';
+      const result = { mode };
+      if (mode === 'static') {
+        result.fields = rowEl.getValue();
+      } else if (mode === 'dynamic') {
+        result.provider = providerRow.getValue();
+      }
+      return result;
+    };
+
     const validator = setupValidation(container, {
       boxId:'form_validation_box',
       okMessage:'✔ Form válido',
       collectState(){
-        return { fields: rowEl.getValue() };
+        const mode = container.querySelector('#form_mode')?.value || 'static';
+        const fields = mode === 'static' ? rowEl.getValue() : [];
+        const provider = mode === 'dynamic' ? providerRow.getValue() : null;
+        return { mode, fields, provider };
       },
       buildRules(st){
         const rules = [];
-        const fs = Array.isArray(st.fields)? st.fields : [];
-        rules.push({kind:'error', when: fs.length===0, msg:'Debes definir al menos un campo.'});
-        rules.push({kind:'warning', when: fs.some(f=>!f.name), msg:'Hay campos sin nombre.'});
-        // select con opciones
-        const selectWithoutOptions = fs.filter(f=>f.type==='select' && !(Array.isArray(f.options)&&f.options.length)).length;
-        if (selectWithoutOptions>0) rules.push({kind:'error', when:true, msg:`Hay ${selectWithoutOptions} select(s) sin opciones.`});
-        // Advertir si ningún locale tiene label
-        const noLabels = fs.filter(f=>!f.i18n || Object.values(f.i18n).every(v => ((v.label||'').trim()===''))).length;
-        if (noLabels>0) rules.push({kind:'warning', when:true, msg:`Hay ${noLabels} campo(s) sin etiqueta en ningún idioma.`});
+        if (st.mode === 'static') {
+          rules.push({kind:'error', when: st.fields.length===0, msg:'Debes definir al menos un campo.'});
+          rules.push({kind:'warning', when: st.fields.some(f=>!f.name), msg:'Hay campos sin nombre.'});
+          // select con opciones
+          const selectWithoutOptions = st.fields.filter(f=>f.type==='select' && !(Array.isArray(f.options)&&f.options.length)).length;
+          if (selectWithoutOptions>0) rules.push({kind:'error', when:true, msg:`Hay ${selectWithoutOptions} select(s) sin opciones.`});
+          // Advertir si ningún locale tiene label
+          const noLabels = st.fields.filter(f=>!f.i18n || Object.values(f.i18n).every(v => ((v.label||'').trim()===''))).length;
+          if (noLabels>0) rules.push({kind:'warning', when:true, msg:`Hay ${noLabels} campo(s) sin etiqueta en ningún idioma.`});
+        } else if (st.mode === 'dynamic') {
+          rules.push({kind:'error', when: !st.provider?.source_list, msg:'Debes indicar la lista (source_list) para modo dinámico.'});
+        }
         return rules;
       }
     });

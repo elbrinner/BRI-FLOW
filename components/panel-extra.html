@@ -2,8 +2,13 @@
   <section class="panel panel-extra">
     <header class="panel-header">
       <h2 class="panel-title">🧩 Nodo Extra</h2>
-      <p class="panel-desc">Punto de sincronización: el frontend aporta un valor <code>extra</code> y el flujo continúa. No requiere prompt; solo define el siguiente nodo (next). Si quieres, puedes usar el campo <i>descripción</i> para notas internas.</p>
+      <p class="panel-desc">Punto de sincronización: el frontend aporta un valor <code>extra</code> y el flujo continúa. No requiere prompt; solo define el siguiente nodo (next). Si quieres, puedes usar el campo <i>descripción</i> para notas internas. Para formularios dinámicos, especifica la fuente de campos.</p>
     </header>
-    <div class="extra-form-slot" data-required-field-group="extra"></div>
+    <div class="extra-form-slot" data-required-field-group="extra">
+      <div class="form-row">
+        <label for="extra_fields_source">Fuente de campos (opcional, para formularios dinámicos):</label>
+        <input type="text" id="extra_fields_source" name="fields_source" placeholder="ej: itemvc_view.CatalogueSections.UseCaseSpecific.Fields">
+      </div>
+    </div>
   </section>
 </template>

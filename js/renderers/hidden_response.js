@@ -1,32 +1,44 @@
+// hidden_response.js - renderer del nodo hidden_response
 (function(){
-  const { setupValidation, markFieldUsed } = window.RendererHelpers || {};
+  const { adoptTemplate, setupValidation, markFieldUsed } = window.RendererHelpers || {};
   const H = window.FormBuilderHelpers || {};
-  const inputRow = H.inputRow || function(){ return document.createElement('div'); };
+
   function renderHiddenResponse(node, container){
-    // No template específico aún; reutiliza container directo
-    container.appendChild(inputRow({label:'Variable a enviar', id:'hidden_var', value: node.varName || ''}));
-    container.appendChild(inputRow({label:'Valor', id:'hidden_value', value: node.value || ''}));
+    container = adoptTemplate(container,'hidden_response','hidden_response-form-slot');
+    // Pre-cargar dataInfo si existe
+    let dataInfoEl = container.querySelector('#hidden_response_dataInfo');
+    // Fallback si el template todavía no estaba cargado al renderizar
+    if(!dataInfoEl){
+      const inputRow = H.inputRow || function({id,value,label,placeholder}){ const r=document.createElement('div'); const lab=document.createElement('label'); lab.textContent=label; const inp=document.createElement('input'); inp.id=id; inp.value=value||''; inp.placeholder=placeholder||''; r.appendChild(lab); r.appendChild(inp); return r; };
+      const row = inputRow({label:'Data Info', id:'hidden_response_dataInfo', value: node.dataInfo || '', placeholder:'ej: {{user_name}} o {"k": "{{val}}"}'});
+      // Insertar antes de la caja de validación si existe
+      const vbox = container.querySelector('#hidden_response_validation_box');
+      if(vbox) container.insertBefore(row, vbox); else container.appendChild(row);
+      dataInfoEl = row.querySelector('#hidden_response_dataInfo');
+    }
+    if(dataInfoEl && node.dataInfo) dataInfoEl.value = node.dataInfo;
+    markFieldUsed(dataInfoEl);
+
     const validator = setupValidation(container, {
       boxId:'hidden_response_validation_box',
-      okMessage:'✔ Hidden listo',
+      okMessage:'✔ Hidden Response válido',
       collectState(){
-        const variable=(container.querySelector('#hidden_var input,#hidden_var')?.value||'').trim();
-        const value=(container.querySelector('#hidden_value input,#hidden_value')?.value||'').trim();
-        return {variable,value};
+        const dataInfo = (dataInfoEl?.value || '').trim();
+        return { dataInfo };
       },
       buildRules(st){
         return [
-          {kind:'error', when: !st.variable, msg:'Variable requerida.'},
-          {kind:'warning', when: !st.value, msg:'Valor vacío: se enviará cadena vacía.'}
+          {kind:'error', when: !st.dataInfo, msg:'Debes definir dataInfo.'},
+          {kind:'warning', when: !!st.dataInfo && !/\{\{.*\}\}/.test(st.dataInfo) && st.dataInfo.length<3, msg:'dataInfo muy corto, revisa si es útil.'}
         ];
       }
     });
-    container.querySelectorAll('input,textarea').forEach(el=>{ el.addEventListener('input',validator.run); el.addEventListener('change',validator.run); });
-    const validation = validator.run();
-    // Instrumentación: marcar slot principal (usamos todo el container al no tener template dedicado)
-    markFieldUsed(container);
-    try { window.dispatchEvent(new CustomEvent('renderer:after',{ detail:{ type:'hidden_response', container, validation } })); } catch(e){}
+    container.querySelectorAll('input').forEach(inp=>{ inp.addEventListener('input', validator.run); inp.addEventListener('change', validator.run); });
+    const result = validator.run();
+    markFieldUsed(container.querySelector('#hidden_response_validation_box'));
+    document.dispatchEvent(new CustomEvent('renderer:after', { detail: { type:'hidden_response', container, validation: result }}));
   }
+
   window.RendererRegistry = window.RendererRegistry || {};
   window.RendererRegistry.hidden_response = renderHiddenResponse;
 })();

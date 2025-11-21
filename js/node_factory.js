@@ -23,6 +23,9 @@
         ensureI18n(base, locales);
         locales.forEach(l => { base.i18n[l].text = base.i18n[l].text || []; });
         break;
+      case 'hidden_response':
+        // No i18n, solo dataInfo
+        break;
       case 'input':
         ensureI18n(base, locales);
         locales.forEach(l => { base.i18n[l].prompt = base.i18n[l].prompt || ''; });

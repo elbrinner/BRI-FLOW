@@ -1,0 +1,16 @@
+<template id="panel-hidden_response-template">
+  <section class="prop-panel-hidden_response">
+    <header class="mb-2">
+      <h3 class="text-sm font-semibold text-gray-700">👻 Hidden Response</h3>
+      <p class="text-xs text-gray-600">Envía datos útiles al frontend sin mostrar respuesta visible.</p>
+    </header>
+    <div class="hidden_response-form-slot space-y-3" data-required-field-group="hidden_response">
+      <div class="form-row" data-field="dataInfo" data-required-field="hidden_response.dataInfo">
+        <label for="hidden_response_dataInfo" class="block text-xs font-medium text-gray-700">Data Info</label>
+        <input type="text" id="hidden_response_dataInfo" placeholder='ej: {{user_name}} o {"k": "{{val}}"}' class="mt-1 w-full border rounded px-2 py-1 text-sm" />
+        <small class="text-[11px] text-gray-500">Expresión evaluada y asignada a <code>dataInfo</code>. Usa {{variable}} para interpolación.</small>
+      </div>
+      <div id="hidden_response_validation_box" class="validation-box mt-2 p-2 border rounded bg-gray-50 text-xs" data-required-field="hidden_response.validation_box"></div>
+    </div>
+  </section>
+</template>
