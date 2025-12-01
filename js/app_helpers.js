@@ -4,7 +4,7 @@
   function refreshConnectionsImpl(state, addEndpoints, jsPlumb) {
     if (typeof jsPlumb === 'undefined') return;
     try { if (jsPlumb.setSuspendDrawing) jsPlumb.setSuspendDrawing(true); } catch(e) { console.warn('suspendDrawing(true) failed', e); }
-    jsPlumb.deleteEveryConnection();
+    try { if (jsPlumb.deleteEveryConnection) jsPlumb.deleteEveryConnection(); } catch(e) { console.warn('deleteEveryConnection failed', e); }
     for (const id in state.nodes) { try { addEndpoints(id); } catch(e) { console.warn('addEndpoints failed for', id, e); } }
     const toConnect = [];
     for (const id in state.nodes) {

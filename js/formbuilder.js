@@ -923,15 +923,26 @@ const FormBuilder = (() => {
   }
 
   function readForm(container, node) {
-    // try to locate the row created by fieldsEditor and call its getValue
+    const mode = container.querySelector('#form_mode')?.value || node.mode || 'static';
+    const save_as = (container.querySelector('#form_save_as input, #form_save_as')?.value || node.save_as || '').trim();
+    if (mode === 'dynamic') {
+      const fields_source = (container.querySelector('#form_fields_source input, #form_fields_source')?.value || '').trim();
+      const filter_expr = (container.querySelector('#form_filter_expr input, #form_filter_expr')?.value || '').trim();
+      const sort_expr = (container.querySelector('#form_sort_expr input, #form_sort_expr')?.value || '').trim();
+      const out = { mode: 'dynamic', fields_source, filter_expr, sort_expr };
+      if (save_as) out.save_as = save_as;
+      return out;
+    }
+    // static
     const inner = container.querySelector('#form_fields_container');
     let fields = [];
     if (inner) {
-      // the row element is likely the parent of the container
       const possibleRow = inner.closest('.form-row') || inner.parentElement;
       if (possibleRow && typeof possibleRow.getValue === 'function') fields = possibleRow.getValue();
     }
-    return { fields };
+    const out = { mode: 'static', fields };
+    if (save_as) out.save_as = save_as;
+    return out;
   }
 
   function readFileUpload(container) {

@@ -35,13 +35,14 @@ Todos los demás tipos de nodos (`start`, `response`, `input`, `button`, `form`,
 - Un canvas para componer nodos (drag & drop), prop panel por tipo de nodo y vista JSON.
 - Renderers de nodos en `js/renderers/` para editar sus propiedades.
 - Un simulador básico para probar la experiencia (no sustituye al backend definitivo).
+ - Guías y patrones para definir flujos reutilizables (post‑vista y post‑solución) y el patrón extract/modify/inject.
 
 ## Tipos de Nodos Disponibles 📦
 
 BRI-FLOW incluye **25+ tipos de nodos** organizados en categorías:
 
 ### Control de Flujo
-- **`start`** - Define variables globales iniciales y los idiomas del flujo
+- **`start`** - Define variables globales iniciales. En el flujo principal centraliza los idiomas soportados (`locales`).
 - **`end`** - Termina el flujo
 - **`condition`** - Evalúa expresión y salta según true/false
 - **`set_goto`** - Guarda punto de retorno para navegación controlada
@@ -150,10 +151,19 @@ Incluye:
 
 **Resumen rápido de nodos principales**:
 
+### Patrones recomendados (EIRA)
+
+- Patrón Extract/Work/Inject: documentado en `egoverabot-assistant/Docs/plan_plano.md`.
+- Flujos reutilizables de salto (jump):
+  - `eira_post_view_actions`: acciones tras completar una vista (flags, descargar y continuar o confirmar).
+  - `eira_post_solution_actions`: acciones al finalizar todas las vistas (descargar solución, reiniciar con otro DBC o finalizar).
+
+Estos patrones evitan duplicación y mejoran la legibilidad del JSON, separando “trabajo de la vista” de “acciones comunes”.
+
 <details>
 <summary><strong>Control de Flujo</strong> (5 nodos)</summary>
 
-- **`start`**: Define variables globales iniciales y los idiomas del flujo. Solo uno por flujo.
+- **`start`**: Define variables globales iniciales. En el flujo principal define y centraliza los idiomas (`locales`). Solo uno por flujo.
 - **`end`**: Termina el flujo. No debe tener `next`.
 - **`condition`**: Evalúa expresión y salta a `true_target` o `false_target`.
 - **`set_goto`**: Guarda en `context.goto` un identificador de retorno.

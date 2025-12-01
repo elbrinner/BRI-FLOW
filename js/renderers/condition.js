@@ -9,6 +9,14 @@
     container = adoptTemplate(container,'condition','condition-form-slot');
     container.appendChild(inputRow({label:'Condición (expr)', id:'cond_expr', value: node.expr || '', placeholder:'context.count > 3'}));
 
+    // Agregar listener para actualizar node.expr
+    const exprInput = container.querySelector('#cond_expr input, #cond_expr textarea, #cond_expr');
+    if (exprInput) {
+      exprInput.addEventListener('input', () => {
+        node.expr = exprInput.value.trim() || '';
+      });
+    }
+
     // Helpers para listas de flujos y nodos según flujo
     function buildFlowSelect(id, currentFlowId){
       const sel = el('select',{id});
@@ -22,7 +30,12 @@
         if (fid === activeId) return;
         sel.appendChild(el('option',{value:fid,text:fid}));
       });
-      sel.value = currentFlowId || '';
+      // Set value: if currentFlowId is activeId, select "(actual)", else select the flowId
+      if (currentFlowId === activeId) {
+        sel.value = '';
+      } else {
+        sel.value = currentFlowId || '';
+      }
       return sel;
     }
     function buildNodeSelect(id){
@@ -49,7 +62,7 @@
     const trueFlowSel = buildFlowSelect('cond_true_flow', node.true_target?.flow_id || '');
     const trueNodeSel = buildNodeSelect('cond_true_node');
     refreshNodeSelect(trueFlowSel, trueNodeSel, node.true_target?.node_id || '');
-    trueFlowSel.addEventListener('change',()=>{
+    trueFlowSel.addEventListener('change', () => {
       // refrescar etiqueta de '(actual)' con el nombre del flujo activo
       try{
         const first = trueFlowSel.querySelector('option[value=""]');
@@ -60,7 +73,20 @@
           first.text = activeId ? `${activeName} (actual)` : '(actual)';
         }
       }catch(_e){}
-      return refreshNodeSelect(trueFlowSel, trueNodeSel, '');
+      const f = trueFlowSel.value || '';
+      const n = trueNodeSel.value || '';
+      node.true_target = (f || n) ? { flow_id: f, node_id: n } : null;
+      // Refrescar el select de nodo cuando cambia el flujo
+      refreshNodeSelect(trueFlowSel, trueNodeSel, '');
+      // Refrescar conexiones
+      if(window.AppConnections?.refreshConnections) window.AppConnections.refreshConnections(window.App?.state);
+    });
+    trueNodeSel.addEventListener('change', () => {
+      const f = trueFlowSel.value || '';
+      const n = trueNodeSel.value || '';
+      node.true_target = (f || n) ? { flow_id: f, node_id: n } : null;
+      // Refrescar conexiones
+      if(window.AppConnections?.refreshConnections) window.AppConnections.refreshConnections(window.App?.state);
     });
     const goTrue = el('button',{type:'button',text:'Ir (TRUE)'});
     goTrue.className = 'ml-2 px-2 py-1 bg-white border rounded text-sm';
@@ -90,7 +116,7 @@
     const falseFlowSel = buildFlowSelect('cond_false_flow', node.false_target?.flow_id || '');
     const falseNodeSel = buildNodeSelect('cond_false_node');
     refreshNodeSelect(falseFlowSel, falseNodeSel, node.false_target?.node_id || '');
-    falseFlowSel.addEventListener('change',()=>{
+    falseFlowSel.addEventListener('change', () => {
       // refrescar etiqueta de '(actual)' con el nombre del flujo activo
       try{
         const first = falseFlowSel.querySelector('option[value=""]');
@@ -101,7 +127,20 @@
           first.text = activeId ? `${activeName} (actual)` : '(actual)';
         }
       }catch(_e){}
-      return refreshNodeSelect(falseFlowSel, falseNodeSel, '');
+      const f = falseFlowSel.value || '';
+      const n = falseNodeSel.value || '';
+      node.false_target = (f || n) ? { flow_id: f, node_id: n } : null;
+      // Refrescar el select de nodo cuando cambia el flujo
+      refreshNodeSelect(falseFlowSel, falseNodeSel, '');
+      // Refrescar conexiones
+      if(window.AppConnections?.refreshConnections) window.AppConnections.refreshConnections(window.App?.state);
+    });
+    falseNodeSel.addEventListener('change', () => {
+      const f = falseFlowSel.value || '';
+      const n = falseNodeSel.value || '';
+      node.false_target = (f || n) ? { flow_id: f, node_id: n } : null;
+      // Refrescar conexiones
+      if(window.AppConnections?.refreshConnections) window.AppConnections.refreshConnections(window.App?.state);
     });
     const goFalse = el('button',{type:'button',text:'Ir (FALSE)'});
     goFalse.className = 'ml-2 px-2 py-1 bg-white border rounded text-sm';
@@ -124,6 +163,12 @@
     });
     fr.appendChild(el('div',{style:'display:flex;gap:8px;align-items:center;'},[falseFlowSel,falseNodeSel,goFalse]));
     container.appendChild(fr);
+
+    // Attach autocomplete to expr input
+    const exprInp = container.querySelector('#cond_expr input, #cond_expr textarea, #cond_expr');
+    if(exprInp && window.FormBuilderHelpers?.attachVarAutocomplete){
+      safe(()=>window.FormBuilderHelpers.attachVarAutocomplete(exprInp,{format:'context'}),'attachVarAutocomplete');
+    }
 
     const validator = setupValidation(container, {
       boxId:'condition_validation_box',

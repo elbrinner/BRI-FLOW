@@ -1,0 +1,34 @@
+{
+  "schema_version": 2,
+  "flow_id": "form_test",
+  "name": "Form Test",
+  "version": "0.0.1",
+  "start_node": "start",
+  "locales": ["es"],
+  "nodes": {
+    "start": {
+      "id": "start",
+      "type": "start",
+      "variables": [
+        {
+          "name": "ucSectionFields",
+          "defaultValue": [
+            { "Name": "nombre", "FieldType": "SHORT", "Prompt": "Tu nombre" },
+            { "Name": "comentario", "FieldType": "LONG", "Prompt": "Comentario" }
+          ],
+          "isList": true
+        }
+      ],
+      "next": { "flow_id": "", "node_id": "f1" }
+    },
+    "f1": {
+      "id": "f1",
+      "type": "form",
+      "mode": "dynamic",
+      "fields_source": "ucSectionFields",
+      "save_as": "uc_form_values",
+      "next": { "flow_id": "", "node_id": "end" }
+    },
+    "end": { "id": "end", "type": "end" }
+  }
+}

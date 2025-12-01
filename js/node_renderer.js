@@ -1,6 +1,6 @@
 // js/node_renderer.js
 // Renderizado y selección de nodos desacoplados de main.js
-(function(){
+(function () {
   const nodeStyles = {
     start: { color: '#2b7cff', bg: 'linear-gradient(90deg,#eef6ff,#fff)', icon: '🚀', label: 'Inicio' },
     response: { color: '#10b981', bg: 'linear-gradient(90deg,#f0fdf4,#fff)', icon: '💬', label: 'Respuesta' },
@@ -18,27 +18,32 @@
     carousel: { color: '#ec4899', bg: 'linear-gradient(90deg,#fdf2f8,#fff)', icon: '🎠', label: 'Carousel' },
     file_upload: { color: '#6b7280', bg: 'linear-gradient(90deg,#f9fafb,#fff)', icon: '📎', label: 'Subir Archivo' },
     json_export: { color: '#6b7280', bg: 'linear-gradient(90deg,#f9fafb,#fff)', icon: '📄', label: 'Exportar JSON' },
-  extra: { color: '#0ea5e9', bg: 'linear-gradient(90deg,#e0f2fe,#fff)', icon: '🧩', label: 'Extra' },
+    extra: { color: '#0ea5e9', bg: 'linear-gradient(90deg,#e0f2fe,#fff)', icon: '🧩', label: 'Extra' },
     end: { color: '#ff6b6b', bg: 'linear-gradient(90deg,#fff6f6,#fff)', icon: '🏁', label: 'Fin' },
     agent_call: { color: '#6366f1', bg: 'linear-gradient(90deg,#eef2ff,#fff)', icon: '🤖', label: 'Agent Call' },
     use_profile: { color: '#10b981', bg: 'linear-gradient(90deg,#f0fdf4,#fff)', icon: '🔐', label: 'Use Profile' },
-    credential_profile: { color: '#f59e0b', bg: 'linear-gradient(90deg,#fffbeb,#fff)', icon: '🔑', label: 'Credential Profile' }
+    credential_profile: { color: '#f59e0b', bg: 'linear-gradient(90deg,#fffbeb,#fff)', icon: '🔑', label: 'Credential Profile' },
+    debug: { color: '#8b5cf6', bg: 'linear-gradient(90deg,#faf5ff,#fff)', icon: '🐛', label: 'Debug' },
+    file_upload: { color: '#06b6d4', bg: 'linear-gradient(90deg,#ecfeff,#fff)', icon: '📎', label: 'File Upload' },
+    json_upload: { color: '#f59e0b', bg: 'linear-gradient(90deg,#fffbeb,#fff)', icon: '📋', label: 'JSON Upload' },
+    json_export: { color: '#10b981', bg: 'linear-gradient(90deg,#f0fdf4,#fff)', icon: '📥', label: 'JSON Export' },
+    file_download: { color: '#8b5cf6', bg: 'linear-gradient(90deg,#faf5ff,#fff)', icon: '💾', label: 'File Download' }
   };
 
   // Helpers locales para formatear valores mostrados en nodos
-  function escHtml(s){
+  function escHtml(s) {
     return String(s)
-      .replaceAll('&','&amp;')
-      .replaceAll('<','&lt;')
-      .replaceAll('>','&gt;')
-      .replaceAll('"','&quot;')
-      .replaceAll("'",'&#39;');
+      .replaceAll('&', '&amp;')
+      .replaceAll('<', '&lt;')
+      .replaceAll('>', '&gt;')
+      .replaceAll('"', '&quot;')
+      .replaceAll("'", '&#39;');
   }
-  function toDisplayAndTitle(raw){
+  function toDisplayAndTitle(raw) {
     let s = '';
     if (raw !== null && raw !== undefined) {
       if (typeof raw === 'string') { s = raw; }
-  else if (typeof raw === 'object') { s = JSON.stringify(raw); }
+      else if (typeof raw === 'object') { s = JSON.stringify(raw); }
       else { s = String(raw); }
     }
     if (s.length > 5) { return { display: 'ℹ️', title: s }; }
@@ -47,14 +52,14 @@
 
   function renderNode(state, node, canvasInner, zoom, addEndpoints, selectNodeFn) {
     // if node element exists, remove to re-render
-    const existing = document.getElementById('node_'+node.id);
-    if(existing) {
+    const existing = document.getElementById('node_' + node.id);
+    if (existing) {
       if (typeof jsPlumb !== 'undefined') {
         try {
           const el = document.getElementById('node_' + node.id);
           if (el) jsPlumb.remove('node_' + node.id);
           else if (window.AppRenderer && window.AppRenderer.debug) console.debug('node_renderer: skip jsPlumb.remove - element missing', 'node_' + node.id);
-        } catch(e) { console.warn('jsPlumb.remove failed for', node.id, e); }
+        } catch (e) { console.warn('jsPlumb.remove failed for', node.id, e); }
       }
       existing.remove();
     }
@@ -62,14 +67,14 @@
     const n = document.createElement('div');
     n.className = 'node';
     if (node.type) n.classList.add(node.type);
-    if(node.type === 'start') { n.classList.add('start'); }
-    if(node.type === 'end') { n.classList.add('end'); }
+    if (node.type === 'start') { n.classList.add('start'); }
+    if (node.type === 'end') { n.classList.add('end'); }
     // Aplicar estilos personalizados
-  const style = nodeStyles[node.type] || { color: '#6b7280', bg: 'linear-gradient(90deg,#f9fafb,#fff)', icon: '📦', label: node.type };
+    const style = nodeStyles[node.type] || { color: '#6b7280', bg: 'linear-gradient(90deg,#f9fafb,#fff)', icon: '📦', label: node.type };
     n.style.borderColor = style.color;
-  n.style.background = style.bg;
-  // Exponer color de acento para CSS (badge/tooltip)
-  try { n.style.setProperty('--node-accent', style.color); } catch(e) { /* noop */ }
+    n.style.background = style.bg;
+    // Exponer color de acento para CSS (badge/tooltip)
+    try { n.style.setProperty('--node-accent', style.color); } catch (e) { /* noop */ }
     // Tooltip accesible (sin usar title nativo para permitir formato visual)
     if (node.descripcion && String(node.descripcion).trim()) {
       n.setAttribute('aria-label', String(node.descripcion).trim());
@@ -77,20 +82,20 @@
       n.removeAttribute('aria-label');
     }
     // Botón: modo y variante
-    if(node.type === 'button') {
+    if (node.type === 'button') {
       const modeClass = (node.mode === 'dynamic') ? 'btn-dynamic' : 'btn-static';
       n.classList.add(modeClass);
       const variant = node.variant || 'primary';
       n.classList.add('btn-var-' + variant);
       if (node.optional) n.classList.add('btn-optional');
     }
-    n.id = 'node_'+node.id;
+    n.id = 'node_' + node.id;
     n.style.left = (node.x || 20) + 'px';
     n.style.top = (node.y || 20) + 'px';
     n.draggable = true;
 
-  const miniText = node.i18n?.es?.prompt ?? node.title ?? '';
-  let html = '';
+    const miniText = node.i18n?.es?.prompt ?? node.title ?? '';
+    let html = '';
     if (node.type === 'condition') {
       const label = (node.expr && node.expr.trim()) ? 'IF' : 'IF';
       html = `
@@ -101,18 +106,18 @@
       <div class="type">${node.type}</div>
       <div class="mini">${miniText}</div>`;
     } else {
-   // Añadir badges simples para botón
-   if (node.type === 'button') {
-     const modeBadge = node.mode === 'dynamic' ? '<span class="badge badge-mode badge-dyn" title="Dinámico">Dyn</span>' : '<span class="badge badge-mode badge-stat" title="Estático">Stat</span>';
-     const variantBadge = `<span class="badge badge-var" title="Variante">${(node.variant||'pri').slice(0,3)}</span>`;
-     html = `<div class="hdr flex items-center gap-1">${style.icon} ${node.id} ${modeBadge} ${variantBadge}</div>
+      // Añadir badges simples para botón
+      if (node.type === 'button') {
+        const modeBadge = node.mode === 'dynamic' ? '<span class="badge badge-mode badge-dyn" title="Dinámico">Dyn</span>' : '<span class="badge badge-mode badge-stat" title="Estático">Stat</span>';
+        const variantBadge = `<span class="badge badge-var" title="Variante">${(node.variant || 'pri').slice(0, 3)}</span>`;
+        html = `<div class="hdr flex items-center gap-1">${style.icon} ${node.id} ${modeBadge} ${variantBadge}</div>
      <div class="type">${node.type}</div>
      <div class="mini">${miniText}</div>`;
-   } else {
-     html = `<div class="hdr flex items-center gap-1">${style.icon} ${node.id}</div>
+      } else {
+        html = `<div class="hdr flex items-center gap-1">${style.icon} ${node.id}</div>
        <div class="type">${node.type}</div>
        <div class="mini">${miniText}</div>`;
-   }
+      }
     }
     // For start node: render declared variables (with defaults) and a summary of all global variables
     if (node.type === 'start') {
@@ -154,24 +159,24 @@
               const { display, title } = toDisplayAndTitle(val);
               if (title) {
                 const tipHtml = `<span class="inline-tip-wrap"><span class="info-tip" aria-label="Valor oculto" tabindex="0">i</span><div class="inline-tip">${escHtml(title)}</div></span>`;
-                return `<span class="tag ${isList? 'tag-list':''}">${escHtml(name)} ${tipHtml}</span>`;
+                return `<span class="tag ${isList ? 'tag-list' : ''}">${escHtml(name)} ${tipHtml}</span>`;
               } else {
                 const label = display ? `${name}: ${display}` : `${name}`;
-                return `<span class="tag ${isList? 'tag-list':''}" title="${escHtml(label)}">${escHtml(label)}</span>`;
+                return `<span class="tag ${isList ? 'tag-list' : ''}" title="${escHtml(label)}">${escHtml(label)}</span>`;
               }
             }).join('');
             html = `<div class="tags-container" title="Variables globales">${tags}</div>` + html;
           }
         }
-      } catch(e) { /* noop */ }
+      } catch (e) { /* noop */ }
     }
     html += '<div class="actions"></div>';
-  // If loop or foreach node, render with connection-based style showing variables
-  if (node.type === 'loop' || node.type === 'foreach') {
+    // If loop or foreach node, render with connection-based style showing variables
+    if (node.type === 'loop' || node.type === 'foreach') {
       const itemVar = node.itemVar || node.item_var || 'item';
       const indexVar = node.indexVar || node.index_var || 'index';
       const sourceList = node.sourceList || node.source_list || '';
-      
+
       const loopHeaderHtml = `
         <div class="loop-header">
           <div class="loop-var-info">
@@ -184,7 +189,7 @@
           <span class="endpoint-hint loop-body-hint">🔁 Loop Body (naranja)</span>
           <span class="endpoint-hint">➡️ Next (azul)</span>
         </div>`;
-      
+
       html += loopHeaderHtml;
     }
     n.innerHTML = html;
@@ -194,30 +199,30 @@
       // limpiar instancias previas si se re-renderiza
       n.querySelectorAll('.node-doc-badge, .node-tooltip').forEach(el => el.remove());
       const desc = (node.descripcion || '').toString().trim();
-  if (desc) {
-        const esc = (s)=>s
-          .replace(/&/g,'&amp;')
-          .replace(/</g,'&lt;')
-          .replace(/>/g,'&gt;')
-          .replace(/"/g,'&quot;')
-          .replace(/'/g,'&#39;');
+      if (desc) {
+        const esc = (s) => s
+          .replace(/&/g, '&amp;')
+          .replace(/</g, '&lt;')
+          .replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;')
+          .replace(/'/g, '&#39;');
         // Badge de documentación (hover/focus)
         const badge = document.createElement('div');
         badge.className = 'node-doc-badge themed';
         badge.title = 'Ver documentación';
-        badge.setAttribute('tabindex','0');
-        badge.setAttribute('role','button');
-        badge.setAttribute('aria-label','Ver documentación del nodo');
-  badge.textContent = 'ℹ️';
+        badge.setAttribute('tabindex', '0');
+        badge.setAttribute('role', 'button');
+        badge.setAttribute('aria-label', 'Ver documentación del nodo');
+        badge.textContent = 'ℹ️';
         n.appendChild(badge);
-          const tip = document.createElement('div');
-          tip.className = 'node-tooltip';
-          tip.innerHTML = `<div class="node-tooltip-header">${style.icon} Descripción</div><div class="node-tooltip-body">${esc(desc).replace(/\n/g,'<br>')}</div>`;
-          n.appendChild(tip);
+        const tip = document.createElement('div');
+        tip.className = 'node-tooltip';
+        tip.innerHTML = `<div class="node-tooltip-header">${style.icon} Descripción</div><div class="node-tooltip-body">${esc(desc).replace(/\n/g, '<br>')}</div>`;
+        n.appendChild(tip);
       }
-    } catch(e) { /* noop */ }
+    } catch (e) { /* noop */ }
 
-    n.addEventListener('click', (ev)=>{ ev.stopPropagation(); if(typeof selectNodeFn === 'function') selectNodeFn(node.id); });
+    n.addEventListener('click', (ev) => { ev.stopPropagation(); if (typeof selectNodeFn === 'function') selectNodeFn(node.id); });
 
     n.addEventListener('dragstart', (ev) => {
       ev.dataTransfer.setData('text/plain', node.id);
@@ -226,7 +231,7 @@
       ev.dataTransfer.setData('dragOffsetY', String((ev.clientY - rect.top) / (zoom || 1)));
     });
 
-    n.addEventListener('dblclick', () => { if(typeof selectNodeFn === 'function') { selectNodeFn(node.id); const el = document.getElementById('prop_id'); if(el) el.focus(); } });
+    n.addEventListener('dblclick', () => { if (typeof selectNodeFn === 'function') { selectNodeFn(node.id); const el = document.getElementById('prop_id'); if (el) el.focus(); } });
 
     if (canvasInner) canvasInner.appendChild(n);
     // If this is a button node, show a small preview of its options
@@ -234,11 +239,11 @@
       const actionsDiv = n.querySelector('.actions');
       if (actionsDiv) {
         if (node.mode === 'static' && Array.isArray(node.options) && node.options.length) {
-          node.options.slice(0,3).forEach(opt => {
+          node.options.slice(0, 3).forEach(opt => {
             const b = document.createElement('button');
             b.className = 'mini-action';
             const label = (opt && opt.label) ? String(opt.label) : (node.i18n?.es?.prompt ? node.i18n.es.prompt : 'btn');
-            b.textContent = label.length > 12 ? label.slice(0,11) + '…' : label;
+            b.textContent = label.length > 12 ? label.slice(0, 11) + '…' : label;
             b.title = label;
             if (opt && opt.target && (opt.target.node_id || opt.target.flow_id)) b.classList.add('has-target');
             b.disabled = true;
@@ -254,7 +259,7 @@
           const badge = document.createElement('span');
           badge.className = 'mini-action dynamic-badge';
           badge.textContent = '⚡ dyn';
-          badge.title = 'Botón dinámico'; 
+          badge.title = 'Botón dinámico';
           actionsDiv.appendChild(badge);
           // mostrar fuente dinámica (variable / source_list) y, cuando sea posible, un recuento
           try {
@@ -275,25 +280,75 @@
                     countText = ` — ${found.defaultValue.length} items`;
                   }
                 }
-              } catch(e) { /* best-effort */ }
+              } catch (e) { /* best-effort */ }
               ds.innerHTML = `from: <code style="font-family:monospace">${source}</code>${countText}`;
             } else {
               ds.textContent = 'from: (source undefined)';
             }
             actionsDiv.appendChild(ds);
-          } catch(e) { console.warn('dynamic preview render failed', e); }
+          } catch (e) { console.warn('dynamic preview render failed', e); }
         }
       }
     }
+    // Añadir botón "Simular desde aquí" (visible en hover)
+    try {
+      const testBtn = document.createElement('button');
+      testBtn.className = 'node-test-btn';
+      testBtn.title = 'Simular desde aquí (▶️)';
+      testBtn.textContent = '▶️';
+      testBtn.style.cssText = `
+        position: absolute;
+        top: 4px;
+        right: 4px;
+        opacity: 0;
+        transition: opacity 0.2s;
+        background: rgba(14, 165, 233, 0.95);
+        color: white;
+        border: none;
+        border-radius: 4px;
+        padding: 3px 8px;
+        font-size: 11px;
+        cursor: pointer;
+        z-index: 10;
+        box-shadow: 0 1px 3px rgba(0,0,0,0.2);
+      `;
+
+      testBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Abrir simulador con este nodo como punto de inicio
+        if (window.Simulador && window.Simulador.testFromNode) {
+          window.Simulador.testFromNode(node.id);
+        }
+      });
+
+      testBtn.addEventListener('mouseenter', () => {
+        testBtn.style.background = 'rgba(3, 105, 161, 0.95)';
+      });
+
+      testBtn.addEventListener('mouseleave', () => {
+        testBtn.style.background = 'rgba(14, 165, 233, 0.95)';
+      });
+
+      n.appendChild(testBtn);
+
+      // Mostrar en hover del nodo
+      n.addEventListener('mouseenter', () => {
+        testBtn.style.opacity = '1';
+      });
+      n.addEventListener('mouseleave', () => {
+        testBtn.style.opacity = '0';
+      });
+    } catch (e) { /* noop */ }
+
     // add endpoints via callback if available
-    try { if (typeof addEndpoints === 'function') addEndpoints(node.id); } catch(e) { /* noop */ }
+    try { if (typeof addEndpoints === 'function') addEndpoints(node.id); } catch (e) { /* noop */ }
   }
 
   function selectNode(state, id, canvas, showPropertiesFn) {
     state.selectedId = id;
     document.querySelectorAll('.node').forEach(nd => nd.style.outline = '');
     const el = document.getElementById('node_' + id);
-    if(el) el.style.outline = '2px solid var(--accent)';
+    if (el) el.style.outline = '2px solid var(--accent)';
     const propsPanel = document.getElementById('properties');
     if (propsPanel) {
       if (id) {
@@ -303,8 +358,8 @@
         propsPanel.classList.remove('force-visible');
       }
     }
-    if(typeof showPropertiesFn === 'function') showPropertiesFn(state.nodes[id]);
+    if (typeof showPropertiesFn === 'function') showPropertiesFn(state.nodes[id]);
   }
 
-  try { window.AppRenderer = { renderNode, selectNode, _styles: nodeStyles }; console.debug('[AppRenderer] module loaded'); } catch(e) {}
+  try { window.AppRenderer = { renderNode, selectNode, _styles: nodeStyles }; console.debug('[AppRenderer] module loaded'); } catch (e) { }
 })();

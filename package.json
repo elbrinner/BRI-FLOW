@@ -1,0 +1,12 @@
+{
+  "name": "bri-flow-tests",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "test:form": "node tests/form_processForm_node_test.mjs"
+  },
+  "devDependencies": {
+    "jsdom": "^22.1.0"
+  }
+}

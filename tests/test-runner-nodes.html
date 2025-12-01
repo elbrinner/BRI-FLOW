@@ -1,0 +1,51 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Bri Flow — Node Smoke Tests</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-white">
+  <header class="px-4 py-3 border-b bg-sky-50">
+    <div class="flex items-center justify-between">
+      <h1 class="text-xl font-bold text-sky-700">Bri Flow — Node Smoke Tests</h1>
+      <nav class="text-sm flex gap-4">
+        <a class="text-sky-700 underline" href="../index.html">← Editor</a>
+        <a class="text-sky-700 underline" href="./test-runner.html">Runner Expr</a>
+      </nav>
+    </div>
+  </header>
+  <main class="p-4 max-w-4xl mx-auto">
+    <section class="mb-4 space-y-2">
+      <p class="text-sm text-gray-700">Pruebas de humo para nuevos tipos de nodo: <code>hidden_response</code> y <code>form</code>.</p>
+      <button id="btnRunNodeSmokeTests" class="px-3 py-1 bg-white border rounded text-sm">Smoke hidden_response + form</button>
+      <button id="btnRunNestedLoopTests" class="px-3 py-1 bg-white border rounded text-sm">Smoke nested loops</button>
+      <button id="btnRunLoopWhileTests" class="px-3 py-1 bg-white border rounded text-sm">Smoke loop + while</button>
+      <button id="btnRunForeachMetadataTest" class="px-3 py-1 bg-white border rounded text-sm">Smoke foreach metadata</button>
+      <button id="btnRunNestedForeachMetaTest" class="px-3 py-1 bg-white border rounded text-sm">Smoke nested foreach metadata</button>
+    </section>
+    <section class="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div class="border rounded p-3">
+        <h2 class="font-semibold mb-2">Resultados</h2>
+        <div id="simulatorChat" class="h-72 overflow-auto border rounded p-2 bg-gray-50 text-xs"></div>
+      </div>
+      <div class="border rounded p-3">
+        <h2 class="font-semibold mb-2">Canvas Preview</h2>
+        <div id="simulatorCanvasPreview" class="h-72 overflow-auto border rounded p-2 bg-white text-xs"></div>
+      </div>
+    </section>
+    <!-- Elementos mínimos requeridos por simulador.js -->
+    <div id="simulatorTimeline" class="hidden"></div>
+    <!-- Botones fantasma para que el simulador no falle al buscar -->
+    <button id="btnStartSim" class="hidden"></button>
+    <button id="btnStopSim" class="hidden"></button>
+  </main>
+
+  <!-- Cargar núcleo y simulador -->
+  <script src="../js/simulador-core.js"></script>
+  <script src="../js/simulador-agents.js"></script>
+  <script src="../js/simulador.js"></script>
+  <script src="./simulator_nodes_smoke_tests.js"></script>
+</body>
+</html>

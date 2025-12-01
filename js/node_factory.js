@@ -11,7 +11,14 @@
     const ensureI18n = (obj, keys) => { obj.i18n = obj.i18n || {}; keys.forEach(l=>{ obj.i18n[l] = obj.i18n[l] || {}; }); };
     switch (t){
       case 'start':
+        // Nodo Start: ahora centraliza definición de locales del proyecto.
         base.variables = base.variables || [];
+        // Si ya trae locales (recreación), respetarlos; si no, tomar de meta.locales o default ['es'].
+        if (!base.locales || !Array.isArray(base.locales) || base.locales.length === 0) {
+          const metaLocales = (stateRef && stateRef.meta && Array.isArray(stateRef.meta.locales) && stateRef.meta.locales.length)
+            ? stateRef.meta.locales : ['es'];
+          base.locales = [...metaLocales];
+        }
         break;
       case 'extra':
         // Nodo minimalista: solo usa next y descripcion; sin props especiales
@@ -134,17 +141,12 @@
 
   function createNode(type, x=20, y=20){
     if (!stateRef) throw new Error('node_factory: state not initialized');
-    // Unicidad de Start: si ya existe uno en el flujo, no crear otro
+    // Unicidad de Start: si ya existe uno en meta, seleccionar
     if (type === 'start') {
       const metaStart = stateRef.meta?.start_node;
-      const hasMetaStart = !!(metaStart && stateRef.nodes[metaStart]);
-      const foundStartId = hasMetaStart ? metaStart : Object.keys(stateRef.nodes || {}).find(id => stateRef.nodes[id]?.type === 'start');
-      if (foundStartId) {
-  alert('El nodo Start ya existe en este flujo. Solo puede haber uno.');
-        // normalizar meta.start_node si no estaba alineado
-        if (!hasMetaStart) stateRef.meta.start_node = foundStartId;
-        selectNode?.(foundStartId);
-        return stateRef.nodes[foundStartId];
+      if (metaStart && stateRef.nodes[metaStart]) {
+        selectNode?.(metaStart);
+        return stateRef.nodes[metaStart];
       }
     }
     // Keep the actual type (foreach/while) so form renderer can pick a specialized panel.
@@ -158,6 +160,10 @@
         renderNode?.(stateRef.nodes[prev]);
       }
       stateRef.meta.start_node = id;
+      // Sincronizar locales hacia meta por compatibilidad con código existente que aún lee meta.locales.
+      if (Array.isArray(base.locales) && base.locales.length) {
+        stateRef.meta.locales = [...base.locales];
+      }
     }
     const locales = Array.isArray(stateRef.meta.locales) && stateRef.meta.locales.length ? stateRef.meta.locales : ['en'];
     // Apply loop defaults when creating foreach/while by asking initNodeByType for 'loop'.

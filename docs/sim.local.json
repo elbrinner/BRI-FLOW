@@ -1,0 +1,7 @@
+{
+  "simulator": {
+    "agentApiBase": "",
+    "mock": true,
+    "notes": "Archivo local mínimo para evitar 404 en modo desarrollo"
+  }
+}

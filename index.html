@@ -1,39 +1,46 @@
 <!DOCTYPE html>
 <html lang="es">
-  <head>
+
+<head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width,initial-scale=1" />
   <title>Bri Flow — Editor Visual</title>
   <link rel="stylesheet" href="css/style.css">
-    <!-- Tailwind CSS CDN -->
-    <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
 </head>
+
 <body>
   <header class="px-4">
     <div class="flex items-center gap-4 w-full">
       <div class="flex items-center gap-3">
         <div class="flex items-center gap-2">
           <span class="text-2xl font-extrabold text-sky-600">Bri Flow</span>
-          <span id="currentFlowBadge" class="ml-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-sky-50 text-sky-700 border border-sky-200" title="Flujo activo">
+          <span id="currentFlowBadge"
+            class="ml-2 inline-flex items-center gap-1 px-2.5 py-1 rounded-full text-xs bg-sky-50 text-sky-700 border border-sky-200"
+            title="Flujo activo">
             <span aria-hidden="true">🧭</span>
-            <span>(sin flujo)</span>
+            <span id="currentFlowName">(sin flujo)</span>
+            <span id="mainFlowChip" class="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700 border border-green-200 hidden">Principal</span>
           </span>
         </div>
       </div>
 
-  <div class="controls ml-auto flex items-center gap-2" aria-label="Controles del editor">
-       
-      
-         <span class="panel-toggles inline-flex items-center gap-2 ml-3">
-          <button id="togglePaletteBtn" title="Mostrar / Ocultar paleta" class="px-3 py-1 bg-white border rounded text-sm">
+      <div class="controls ml-auto flex items-center gap-2" aria-label="Controles del editor">
+
+
+        <span class="panel-toggles inline-flex items-center gap-2 ml-3">
+          <button id="togglePaletteBtn" title="Mostrar / Ocultar paleta"
+            class="px-3 py-1 bg-white border rounded text-sm">
             <span class="inline-flex items-center gap-2">
               <span aria-hidden="true">🛠️</span>
               <span>Nodos</span>
             </span>
           </button>
-         
+
         </span>
-        <button id="btnOpenFlows" class="px-3 py-1 bg-white border rounded text-sm" title="Gestionar flujos del proyecto">
+        <button id="btnOpenFlows" class="px-3 py-1 bg-white border rounded text-sm"
+          title="Gestionar flujos del proyecto">
           <span class="inline-flex items-center gap-2">
             <svg aria-hidden="true" class="w-4 h-4 text-sky-600" viewBox="0 0 24 24" fill="currentColor">
               <path d="M4 6h16v2H4zM4 11h16v2H4zM4 16h10v2H4z"></path>
@@ -53,25 +60,27 @@
             <span>Guardar</span>
           </span>
         </button>
-    <button id="btnOpenSimulatorModal" title="Abrir simulador en modal" class="px-3 py-1 bg-white border rounded text-sm">
-      <span class="inline-flex items-center gap-2">
-        <!-- Play icon (green) -->
-        <svg aria-hidden="true" class="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
-          <path d="M8 5v14l11-7-11-7z"></path>
-        </svg>
-        <span>Simulador</span>
-      </span>
-    </button>
-  <button id="btnShowJson" title="Ver JSON generado" class="px-3 py-1 bg-white border rounded text-sm">
-    <span class="inline-flex items-center gap-2">
-      <!-- Code brackets icon -->
-      <svg aria-hidden="true" class="w-4 h-4 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-        <path d="M9 8L5 12l4 4"/>
-        <path d="M15 8l4 4-4 4"/>
-      </svg>
-      <span>Ver JSON</span>
-    </span>
-  </button>
+        <button id="btnOpenSimulatorModal" title="Abrir simulador en modal"
+          class="px-3 py-1 bg-white border rounded text-sm">
+          <span class="inline-flex items-center gap-2">
+            <!-- Play icon (green) -->
+            <svg aria-hidden="true" class="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M8 5v14l11-7-11-7z"></path>
+            </svg>
+            <span>Simulador</span>
+          </span>
+        </button>
+        <button id="btnShowJson" title="Ver JSON generado" class="px-3 py-1 bg-white border rounded text-sm">
+          <span class="inline-flex items-center gap-2">
+            <!-- Code brackets icon -->
+            <svg aria-hidden="true" class="w-4 h-4 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 8L5 12l4 4" />
+              <path d="M15 8l4 4-4 4" />
+            </svg>
+            <span>Ver JSON</span>
+          </span>
+        </button>
 
         <span class="zoom-controls inline-flex items-center gap-2 ml-2">
           <button id="zoomOut" title="Alejar" class="px-2 py-1 bg-white border rounded">−</button>
@@ -80,61 +89,83 @@
           <button id="btnCenterCanvas" title="Centrar canvas al contenido" class="px-2 py-1 bg-white border rounded">
             <span class="inline-flex items-center gap-2">
               <!-- Crosshair/Target icon -->
-              <svg aria-hidden="true" class="w-4 h-4 text-sky-600" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <svg aria-hidden="true" class="w-4 h-4 text-sky-600" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
                 <circle cx="12" cy="12" r="6"></circle>
                 <path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path>
               </svg>
             </span>
           </button>
-         
+
         </span>
 
         <!-- Botón de ayuda global -->
-        <button id="btnHelpDoc" title="Ayuda de expresiones (len, split, etc.)" class="px-2 py-1 bg-white border rounded" aria-label="Ayuda">
+        <button id="btnHelpDoc" title="Ayuda de expresiones (len, split, etc.)"
+          class="px-2 py-1 bg-white border rounded" aria-label="Ayuda">
           <span class="inline-flex items-center gap-2">
             <span aria-hidden="true">ℹ️</span>
             <span class="text-sm">Ayuda</span>
           </span>
         </button>
 
-  <input id="importFile" type="file" accept=".json" multiple class="text-sm file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 hidden" />
-  <input id="importFolder" type="file" accept=".json" webkitdirectory directory multiple class="hidden" />
+        <input id="importFile" type="file" accept=".json" multiple
+          class="text-sm file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 hidden" />
+        <input id="importFolder" type="file" accept=".json" webkitdirectory directory multiple class="hidden" />
 
-       
 
-        
+
+
       </div>
     </div>
   </header>
 
   <main>
-  <aside id="palette" aria-label="Paleta de nodos">
+    <aside id="palette" aria-label="Paleta de nodos">
       <h2>Nodos</h2>
-      
-      <div class="draggable start-special" draggable="true" data-type="start" title="Nodo de inicio del flujo (solo 1 por flujo)">🚀 Start</div>
-            <div class="draggable" draggable="true" data-type="response">📣 Response</div>
+
+      <div class="draggable start-special" draggable="true" data-type="start"
+        title="Nodo de inicio del flujo (solo 1 por flujo)">🚀 Start</div>
+      <div class="draggable" draggable="true" data-type="response">📣 Response</div>
       <div class="draggable" draggable="true" data-type="input">⌨️ Input</div>
-  <div class="draggable" draggable="true" data-type="assign_var">🔧 Assign Variable</div>
-  <div class="draggable" draggable="true" data-type="button">🔘 Button</div>
-  <div class="draggable" draggable="true" data-type="multi_button" title="Permite seleccionar varias opciones">✅ Multi Select Button</div> 
+      <div class="draggable" draggable="true" data-type="assign_var">🔧 Assign Variable</div>
+      <div class="draggable" draggable="true" data-type="button">🔘 Button</div>
+      <div class="draggable" draggable="true" data-type="multi_button" title="Permite seleccionar varias opciones">✅
+        Multi Select Button</div>
       <div class="draggable" draggable="true" data-type="rest_call">🔗 API REST Call</div>
 
-  <div class="draggable" draggable="true" data-type="foreach" title="Itera sobre una lista (simple)">🔁 ForEach</div>
-  <div class="draggable" draggable="true" data-type="while" title="Itera mientras la condición sea verdadera">⏳ While</div>
-  <div class="draggable" draggable="true" data-type="extra" title="Nodo Extra: espera valor externo del frontend">🧩 Extra</div>
+      <div class="draggable" draggable="true" data-type="foreach" title="Itera sobre una lista (simple)">🔁 ForEach
+      </div>
+      <div class="draggable" draggable="true" data-type="while" title="Itera mientras la condición sea verdadera">⏳
+        While</div>
+      <div class="draggable" draggable="true" data-type="extra" title="Nodo Extra: espera valor externo del frontend">🧩
+        Extra</div>
 
- 
+
       <div class="draggable" draggable="true" data-type="form">📝 Form</div>
-    <div class="draggable" draggable="true" data-type="choice_switch" title="Choice (switch): evalúa casos y salta automáticamente">🔀 Choice (switch)</div>
-    <div class="draggable" draggable="true" data-type="flow_jump" title="Llama a otro flujo y puede volver al origen">⤴️ Flow Jump</div>
-      
-  <div class="draggable" draggable="true" data-type="condition">❓ Condition (If)</div>
-    <div class="draggable" draggable="true" data-type="agent_call" title="Llamada a agente (RAG o normal)">🤖 Agent Call</div>
-  <div class="draggable" draggable="true" data-type="set_goto">🔙 Set Goto</div>
-  <div class="draggable" draggable="true" data-type="end" title="Nodo fin del flujo">🏁 End</div>
+      <div class="draggable" draggable="true" data-type="choice_switch"
+        title="Choice (switch): evalúa casos y salta automáticamente">🔀 Choice (switch)</div>
+      <div class="draggable" draggable="true" data-type="flow_jump" title="Llama a otro flujo y puede volver al origen">
+        ⤴️ Flow Jump</div>
 
-  
-  
+      <div class="draggable" draggable="true" data-type="condition">❓ Condition (If)</div>
+      <div class="draggable" draggable="true" data-type="agent_call" title="Llamada a agente (RAG o normal)">🤖 Agent
+        Call</div>
+      <div class="draggable" draggable="true" data-type="set_goto">🔙 Set Goto</div>
+      <div class="draggable" draggable="true" data-type="end" title="Nodo fin del flujo">🏁 End</div>
+      <div class="draggable" draggable="true" data-type="debug" title="Nodo debug: muestra mensaje y datos">🐛 Debug
+      </div>
+      <div class="draggable" draggable="true" data-type="file_upload" title="Subir archivo">📎 File Upload</div>
+      <div class="draggable" draggable="true" data-type="json_upload"
+        title="Subir JSON (envía datos parseados vía extra)">📋 JSON Upload</div>
+      <div class="draggable" draggable="true" data-type="json_export" title="Descargar JSON">📥 JSON Export</div>
+      <div class="draggable" draggable="true" data-type="file_download" title="Descargar archivo">💾 File Download</div>
+      <div class="draggable" draggable="true" data-type="hero_card" title="Tarjeta visual con botones">🃏 Hero Card
+      </div>
+      <div class="draggable" draggable="true" data-type="carousel" title="Carrusel de tarjetas">🎠 Carousel</div>
+      <div class="draggable" draggable="true" data-type="hidden_response"
+        title="Respuesta oculta (no visible al usuario)">👻 Hidden Response</div>
+
+
     </aside>
 
     <section id="canvasSection" aria-label="Canvas de diseño">
@@ -146,8 +177,8 @@
 
     <aside id="properties" aria-label="Panel de propiedades">
       <h2>Propiedades</h2>
-      
-  <output id="noSelection" aria-live="polite">Selecciona un nodo en el canvas para editar sus propiedades.</output>
+
+      <output id="noSelection" aria-live="polite">Selecciona un nodo en el canvas para editar sus propiedades.</output>
       <form id="propForm" style="display:none;">
         <div class="form-row">
           <label for="prop_id">ID nodo</label>
@@ -164,37 +195,48 @@
         </div>
 
         <div class="form-row actions flex gap-2 mt-4">
-          <button type="submit" class="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700 transition font-semibold text-sm">Aplicar</button>
-          <button type="button" id="btnDeleteNode" class="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition font-semibold text-sm">Eliminar nodo</button>
+          <button type="submit"
+            class="px-4 py-2 bg-green-600 text-white rounded shadow hover:bg-green-700 transition font-semibold text-sm">Aplicar</button>
+          <button type="button" id="btnDeleteNode"
+            class="px-4 py-2 bg-red-500 text-white rounded shadow hover:bg-red-600 transition font-semibold text-sm">Eliminar
+            nodo</button>
         </div>
       </form>
     </aside>
   </main>
 
 
-    <div id="simulatorPanel" class="simulator-panel border rounded p-2 bg-white">
-      <div id="simulatorTimeline" class="sim-timeline h-40 overflow-auto" style="min-height:120px;">Registro de ejecución del simulador</div>
-      <div id="simulatorCanvasPreview" class="sim-canvas-preview mt-2 h-48 border rounded p-2 bg-gray-50" style="min-height:160px; margin-top:8px;">Vista previa del flujo (nodos visitados, variables, respuestas)</div>
-      <div class="mt-2 flex items-center gap-2">
-        <input id="simExtraInput" class="border rounded px-2 py-1 flex-1" placeholder='JSON extra por paso (ej: {"userId":42})' type="text" value="hola" />
-        <button id="simExtraClear" class="px-2 py-1 bg-white border rounded text-sm" title="Limpiar JSON extra">Limpiar</button>
-      </div>
-      <div class="mt-2 flex items-center gap-2">
-        <label for="simTurnSelect" class="text-xs text-gray-600">turn</label>
-        <select id="simTurnSelect" class="border rounded px-2 py-1 text-sm">
-          <option value="">(no inyectar)</option>
-          <option value="user">user</option>
-          <option value="assistant">assistant</option>
-        </select>
-        <button id="simTurnClear" class="px-2 py-1 bg-white border rounded text-sm" title="Limpiar turn">Limpiar</button>
-      </div>
-      <div class="mt-2 flex items-center gap-2">
-        <input id="simOriginInput" class="border rounded px-2 py-1 flex-1" placeholder='origin (JSON) ej: {"role":"user","value":"hola","node":"n1"}' type="text" />
-        <button id="simOriginClear" class="px-2 py-1 bg-white border rounded text-sm" title="Limpiar origin">Limpiar</button>
-      </div>
-      <div class="text-xs text-gray-500 mt-1">El campo extra es efímero por paso. Si quieres conservarlo, asígnalo a una variable con un nodo AssignVar.</div>
-      <div class="text-xs text-gray-500">Los campos turn y origin también son efímeros por paso; se limpian automáticamente tras cada paso.</div>
+  <div id="simulatorPanel" class="simulator-panel border rounded p-2 bg-white">
+    <div id="simulatorTimeline" class="sim-timeline h-40 overflow-auto" style="min-height:120px;">Registro de ejecución
+      del simulador</div>
+    <div id="simulatorCanvasPreview" class="sim-canvas-preview mt-2 h-48 border rounded p-2 bg-gray-50"
+      style="min-height:160px; margin-top:8px;">Vista previa del flujo (nodos visitados, variables, respuestas)</div>
+    <div class="mt-2 flex items-center gap-2">
+      <input id="simExtraInput" class="border rounded px-2 py-1 flex-1"
+        placeholder='JSON extra por paso (ej: {"userId":42})' type="text" value="hola" />
+      <button id="simExtraClear" class="px-2 py-1 bg-white border rounded text-sm"
+        title="Limpiar JSON extra">Limpiar</button>
     </div>
+    <div class="mt-2 flex items-center gap-2">
+      <label for="simTurnSelect" class="text-xs text-gray-600">turn</label>
+      <select id="simTurnSelect" class="border rounded px-2 py-1 text-sm">
+        <option value="">(no inyectar)</option>
+        <option value="user">user</option>
+        <option value="assistant">assistant</option>
+      </select>
+      <button id="simTurnClear" class="px-2 py-1 bg-white border rounded text-sm" title="Limpiar turn">Limpiar</button>
+    </div>
+    <div class="mt-2 flex items-center gap-2">
+      <input id="simOriginInput" class="border rounded px-2 py-1 flex-1"
+        placeholder='origin (JSON) ej: {"role":"user","value":"hola","node":"n1"}' type="text" />
+      <button id="simOriginClear" class="px-2 py-1 bg-white border rounded text-sm"
+        title="Limpiar origin">Limpiar</button>
+    </div>
+    <div class="text-xs text-gray-500 mt-1">El campo extra es efímero por paso. Si quieres conservarlo, asígnalo a una
+      variable con un nodo AssignVar.</div>
+    <div class="text-xs text-gray-500">Los campos turn y origin también son efímeros por paso; se limpian
+      automáticamente tras cada paso.</div>
+  </div>
   </section>
   <section id="jsonOutSection">
     <h2>JSON generado</h2>
@@ -223,8 +265,9 @@
   <script src="js/renderers/start.js"></script>
   <script src="js/renderers/hero_card.js"></script>
   <script src="js/renderers/carousel.js"></script>
-  <script src="js/renderers/form.js"></script>
+  <script src="js/renderers/form_v2.js"></script>
   <script src="js/renderers/file_upload.js"></script>
+  <script src="js/renderers/json_upload.js"></script>
   <script src="js/renderers/json_export.js"></script>
   <script src="js/renderers/file_download.js"></script>
   <script src="js/renderers/end.js"></script>
@@ -243,33 +286,99 @@
   <script src="js/app_helpers.js"></script>
   <script src="js/ui_state.js"></script>
   <script src="js/canvas_drag.js"></script>
+  <script src="js/keyboard_controls.js"></script>
   <script src="js/serializer.js"></script>
   <script src="js/io.js"></script>
   <script src="js/node_factory.js"></script>
   <script src="js/main.js"></script>
   <script src="js/project_flows.js"></script>
- <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.umd.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.umd.js"></script>
   <script src="js/expression_parser.js"></script>
   <script src="js/flow_ui.js"></script>
   <script src="js/flow_runner.js"></script>
   <script src="js/runtime_demo.js"></script>
+  <script src="js/simulador-evaluator.js"></script>
+  <script src="js/simulador-nodes.js"></script>
+  <script src="js/simulador-agents.js"></script>
+  <script src="js/nodes/processResponse.js"></script>
+  <script src="js/nodes/processHiddenResponse.js"></script>
+  <script src="js/nodes/processEnd.js"></script>
+  <script src="js/nodes/processInput.js"></script>
+  <script src="js/nodes/processChoice.js"></script>
+  <script src="js/nodes/processButton.js"></script>
+  <script src="js/nodes/processMultiButton.js"></script>
+  <script src="js/nodes/processForm.js?v=20251129"></script>
   <script src="js/simulador.js"></script>
   <script src="js/sim_profiles.js"></script>
-  
+
   <script src="js/renderer_usage_report.js"></script>
   <script src="js/template_selftest.js"></script>
+  <script src="js/json_modal.js"></script>
   <script>
     // Wire center canvas button
     document.addEventListener('DOMContentLoaded', () => {
       const btn = document.getElementById('btnCenterCanvas');
       btn?.addEventListener('click', () => {
-        try { globalThis.App?.fitCanvasToContent?.(); } catch(e){ console.warn('[UI] fitCanvasToContent failed', e); }
+        try {
+          // Asegura que el canvas crezca antes de centrar y ajusta zoom para encuadrar
+          globalThis.App?.autoGrowCanvas?.();
+          globalThis.App?.fitCanvasToContent?.(80, true);
+        } catch (e) { console.warn('[UI] fitCanvasToContent failed', e); }
       });
     });
   </script>
+  <script>
+    // Auto-loader para pruebas rápidas: ?autotest=1 carga tests/form_test.json y abre el simulador
+    document.addEventListener('DOMContentLoaded', async () => {
+      try {
+        const params = new URLSearchParams(location.search);
+        if (!params.has('autotest')) return;
+        const res = await fetch('tests/form_test.json', { cache: 'no-store' });
+        if (!res.ok) { console.warn('[AutoTest] fetch falló', res.status); return; }
+        const data = await res.json();
+        // Importar flujo en el editor
+        if (window.App && typeof window.App.importJson === 'function') {
+          try { window.App.importJson(data); } catch (e) { console.warn('[AutoTest] importJson falló', e); }
+        }
+        // Marcar flow_id activo si existe soporte de proyecto
+        try {
+          window.AppProject = window.AppProject || {}; window.AppProject.flows = window.AppProject.flows || {};
+          if (data.flow_id) {
+            window.AppProject.flows[data.flow_id] = { meta: { name: data.name || data.flow_id, start_node: data.start_node }, nodes: data.nodes };
+            window.AppProject.active_flow_id = data.flow_id;
+          }
+        } catch (_) { }
+        // Abrir simulador
+        setTimeout(() => {
+          const btn = document.getElementById('btnOpenSimulatorModal');
+          if (btn) btn.click();
+        }, 400);
+      } catch (e) {
+        console.warn('[AutoTest] error', e);
+      }
+    });
+  </script>
+  <script>
+    // Bootstrap temporal SOLO para esta prueba: si estamos en localhost y no hay ?autotest,
+    // redirige una vez a ?autotest=1. Se controla con localStorage 'bri_autotest_once'.
+    (function () {
+      try {
+        const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
+        const hasAuto = new URLSearchParams(location.search).has('autotest');
+        const already = localStorage.getItem('bri_autotest_once') === 'done';
+        if (isLocal && !hasAuto && !already) {
+          localStorage.setItem('bri_autotest_once', 'done');
+          const url = new URL(location.href);
+          url.searchParams.set('autotest', '1');
+          location.replace(url.toString());
+        }
+      } catch (e) { /* noop */ }
+    })();
+  </script>
 
   <!-- Modal Flujos -->
-  <div id="flowsModal" class="fixed inset-0 z-[360] hidden items-center justify-center bg-black bg-opacity-40" aria-hidden="true" role="dialog" aria-modal="true" tabindex="-1">
+  <div id="flowsModal" class="fixed inset-0 z-[360] hidden items-center justify-center bg-black bg-opacity-40"
+    aria-hidden="true" role="dialog" aria-modal="true" tabindex="-1">
     <div class="w-full max-w-2xl bg-white rounded-lg shadow-lg overflow-hidden flex flex-col max-h-[80vh]">
       <div class="flex items-center justify-between p-4 border-b">
         <h3 class="text-lg font-semibold">Flujos del proyecto</h3>
@@ -278,8 +387,10 @@
       <div class="p-4 space-y-3 flex-1 overflow-y-auto">
         <div class="flex items-center gap-2">
           <button id="btnCreateFlow" class="px-3 py-2 bg-sky-600 text-white rounded text-sm">Nuevo flujo</button>
-          <button id="btnUpsertCurrent" class="px-3 py-2 bg-white border rounded text-sm" title="Guardar/actualizar el flujo abierto en el proyecto">Añadir/Actualizar actual</button>
-          <button id="btnImportFolder" class="px-3 py-2 bg-white border rounded text-sm" title="Importar todos los .json de una carpeta">Abrir carpeta</button>
+          <button id="btnUpsertCurrent" class="px-3 py-2 bg-white border rounded text-sm"
+            title="Guardar/actualizar el flujo abierto en el proyecto">Añadir/Actualizar actual</button>
+          <button id="btnImportFolder" class="px-3 py-2 bg-white border rounded text-sm"
+            title="Importar todos los .json de una carpeta">Abrir carpeta</button>
         </div>
         <div id="flowsList" class="divide-y border rounded"></div>
       </div>
@@ -290,12 +401,15 @@
   </div>
   <!-- Modal de Ayuda extraído: se carga desde components/help_modal.html por js/help_modal.js -->
   <script src="js/help_modal.js"></script>
-    <script src="js/template_loader.js"></script>
+  <script src="js/template_loader.js"></script>
   <!-- JSON modal -->
 
   <style>
     /* Backdrop y layout para dialog de ayuda */
-    #helpModal::backdrop { background: rgba(0,0,0,0.4); }
+    #helpModal::backdrop {
+      background: rgba(0, 0, 0, 0.4);
+    }
+
     /* Layout modal simulator: left debug 40% / right chat 60%; responsive stack on small screens */
     .simulator-grid {
       display: grid;
@@ -303,12 +417,23 @@
       gap: 0;
       height: calc(90vh - 56px);
     }
-    @media (max-width: 768px){
-      .simulator-grid { grid-template-columns: 1fr; height: auto; }
-      .simulator-grid aside { order: -1; }
+
+    @media (max-width: 768px) {
+      .simulator-grid {
+        grid-template-columns: 1fr;
+        height: auto;
+      }
+
+      .simulator-grid aside {
+        order: -1;
+      }
     }
+
     /* Ensure pre elements in debug are readable */
-    #simulatorDebugPanel pre { color: #111827; background: #ffffff; }
+    #simulatorDebugPanel pre {
+      color: #111827;
+      background: #ffffff;
+    }
   </style>
 
   <div id="jsonModal" class="modal-overlay" style="display:none" aria-hidden="true">
@@ -319,14 +444,27 @@
       </div>
       <div class="modal-body">
         <div class="modal-actions">
-          <button id="jsonModalCopy" class="px-3 py-1 bg-sky-600 text-white rounded text-sm">Copiar al portapapeles</button>
+          <button id="jsonModalCopy" class="px-3 py-1 bg-sky-600 text-white rounded text-sm">Copiar</button>
+          <button id="jsonModalEdit" class="px-3 py-1 bg-white border rounded text-sm">Editar</button>
+          <button id="jsonModalSave" class="px-3 py-1 bg-green-600 text-white rounded text-sm"
+            style="display:none">Guardar</button>
+          <button id="jsonModalCancel" class="px-3 py-1 bg-white border rounded text-sm"
+            style="display:none">Cancelar</button>
+          <button id="jsonModalFormat" class="px-3 py-1 bg-white border rounded text-sm"
+            style="display:none">Formatear</button>
+          <button id="jsonModalValidate" class="px-3 py-1 bg-white border rounded text-sm"
+            style="display:none">Validar</button>
         </div>
         <pre id="jsonModalContent" class="json-content">{ }</pre>
+        <textarea id="jsonModalEditor" class="json-editor"
+          style="display:none; width:100%; min-height:50vh; font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; font-size:12px; line-height:1.4; border:1px solid #e5e7eb; border-radius:6px; padding:8px; background:#ffffff;"></textarea>
+        <div id="jsonModalWarnings" class="mt-2 text-xs" style="display:none"></div>
       </div>
     </div>
   </div>
   <!-- Simulador Modal (chat) -->
-  <div id="simulatorModal" class="fixed inset-0 z-[300] hidden items-center justify-center bg-black bg-opacity-40" aria-hidden="true">
+  <div id="simulatorModal" class="fixed inset-0 z-[300] hidden items-center justify-center bg-black bg-opacity-40"
+    aria-hidden="true">
     <div class="w-full max-w-6xl h-[90vh] bg-white rounded-lg shadow-lg flex flex-col overflow-hidden">
       <!-- Modal header -->
       <div class="flex items-center justify-between p-4 border-b">
@@ -339,8 +477,9 @@
           </span>
         </h3>
         <div class="flex items-center gap-2">
-          <button id="btnProfilesManager" class="px-3 py-1 bg-white border rounded text-sm" title="Gestionar perfiles del simulador">Perfiles</button>
- 
+          <button id="btnProfilesManager" class="px-3 py-1 bg-white border rounded text-sm"
+            title="Gestionar perfiles del simulador">Perfiles</button>
+
           <button id="btnShowHelp" class="px-3 py-1 bg-white border rounded text-sm" title="Mostrar ayuda">?</button>
           <button id="simulatorModalClose" class="text-gray-600 hover:text-gray-900">✕</button>
         </div>
@@ -350,35 +489,45 @@
       <div class="modal-body flex-1 overflow-hidden p-4">
         <div class="simulator-grid h-full">
           <!-- Left: debug panel (40%) -->
-          <aside id="simulatorDebugPanel" aria-label="Panel de depuración del simulador" class="border-r bg-gray-50 p-4 flex flex-col gap-4 overflow-auto text-xs">
-            <div id="simulatorWarnings" class="hidden p-2 rounded border border-amber-300 bg-amber-50 text-amber-800"></div>
+          <aside id="simulatorDebugPanel" aria-label="Panel de depuración del simulador"
+            class="border-r bg-gray-50 p-4 flex flex-col gap-4 overflow-auto text-xs">
+            <div id="simulatorWarnings" class="hidden p-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
+            </div>
             <div>
               <h4 class="font-semibold mb-1 text-sm">Flow JSON</h4>
-              <pre id="debugFlowJson" class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">{}</pre>
+              <pre id="debugFlowJson"
+                class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">{}</pre>
             </div>
             <div>
               <h4 class="font-semibold mb-1 text-sm">Nodo actual</h4>
-              <pre id="debugCurrentNode" class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">{}</pre>
+              <pre id="debugCurrentNode"
+                class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">{}</pre>
             </div>
             <div>
               <h4 class="font-semibold mb-1 text-sm">Variables</h4>
-              <pre id="debugVariables" class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">{}</pre>
+              <pre id="debugVariables"
+                class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">{}</pre>
             </div>
             <div>
               <h4 class="font-semibold mb-1 text-sm">Call stack</h4>
-              <pre id="debugCallStack" class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">(vacía)</pre>
+              <pre id="debugCallStack"
+                class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">(vacía)</pre>
             </div>
             <div>
               <h4 class="font-semibold mb-1 text-sm">Diff variables</h4>
-              <pre id="debugVarDiff" class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">(sin cambios)</pre>
+              <pre id="debugVarDiff"
+                class="text-[11px] leading-snug bg-white border rounded p-2 max-h-40 overflow-auto">(sin cambios)</pre>
             </div>
             <div>
               <h4 class="font-semibold mb-1 text-sm">Editar variables</h4>
-              <div id="simulatorVarsList" class="space-y-2 overflow-auto bg-white border rounded p-2" style="max-height:28vh"></div>
+              <div id="simulatorVarsList" class="space-y-2 overflow-auto bg-white border rounded p-2"
+                style="max-height:28vh"></div>
             </div>
             <div class="mt-auto">
-              <button id="btnVarsSave" class="w-full mb-2 px-3 py-2 bg-sky-600 text-white rounded text-sm">Guardar variables</button>
-              <button id="btnVarsReset" class="w-full px-3 py-2 bg-white border rounded text-sm">Reset variables</button>
+              <button id="btnVarsSave" class="w-full mb-2 px-3 py-2 bg-sky-600 text-white rounded text-sm">Guardar
+                variables</button>
+              <button id="btnVarsReset" class="w-full px-3 py-2 bg-white border rounded text-sm">Reset
+                variables</button>
             </div>
           </aside>
 
@@ -389,7 +538,8 @@
             </div>
             <div id="simulatorChat" class="p-4 flex-1 overflow-auto bg-gray-50"></div>
             <div class="p-4 border-t bg-white flex gap-2 items-center">
-              <input id="simulatorInputBox" type="text" placeholder="Escribe tu respuesta..." class="flex-1 px-3 py-2 border rounded-md" />
+              <input id="simulatorInputBox" type="text" placeholder="Escribe tu respuesta..."
+                class="flex-1 px-3 py-2 border rounded-md" />
               <button id="simulatorSendBtn" class="px-4 py-2 bg-sky-600 text-white rounded">Enviar</button>
             </div>
           </div>
@@ -399,7 +549,8 @@
   </div>
 </body>
 
-  <!-- JSON modal -->
+<!-- JSON modal -->
 
 </body>
+
 </html>

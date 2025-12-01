@@ -60,6 +60,32 @@
     dynamicProps.innerHTML = '';
   // call builder
   const reader = FormBuilder.renderPropsFor(node, dynamicProps, Object.keys(state.nodes));
+  // Regla: solo flujo principal (meta.is_main === true) puede editar locales en nodo start.
+  try {
+    if (node.type === 'start') {
+      const isMain = !!(state && state.meta && state.meta.is_main);
+      if (!isMain) {
+        // Buscar controles que gestionan locales (por id conocido o heurística por label)
+        const localeRow = dynamicProps.querySelector('[data-prop="locales"], #start_locales');
+        if (localeRow) {
+          const row = localeRow.closest('.form-row') || localeRow;
+          if (row) {
+            row.style.display = 'none';
+            row.dataset.hiddenBy = 'non-main-flow';
+          }
+        } else {
+          // Heurística: label que contiene 'Idioma' o 'Locales'
+          dynamicProps.querySelectorAll('.form-row label').forEach(l => {
+            const txt = (l.textContent||'').toLowerCase();
+            if (txt.includes('idioma') || txt.includes('locale')) {
+              const r = l.closest('.form-row');
+              if (r) { r.style.display = 'none'; r.dataset.hiddenBy = 'non-main-flow'; }
+            }
+          });
+        }
+      }
+    }
+  } catch(e) { console.warn('[node_editor] ocultar locales fallo', e); }
   // Asegurar que el contenedor dinámico esté visible; filtramos filas indeseadas aparte
   try { dynamicProps.style.display = ''; } catch(_e){}
     // Helpers para ocultar/mostrar filas por id de elemento interno
@@ -422,7 +448,9 @@
       const prev = state.meta.start_node;
       if(prev && prev !== node.id && state.nodes[prev]) { state.nodes[prev].type = 'response'; renderNode(state.nodes[prev]); }
       state.meta.start_node = node.id;
-      if (values.locales && Array.isArray(values.locales) && values.locales.length) {
+      // Solo si flujo principal permite aplicar locales
+      const isMainFlow = !!(state && state.meta && state.meta.is_main);
+      if (isMainFlow && values.locales && Array.isArray(values.locales) && values.locales.length) {
         state.meta.locales = values.locales;
         for (const id in state.nodes) {
           const n = state.nodes[id];

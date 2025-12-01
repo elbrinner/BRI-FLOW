@@ -150,7 +150,24 @@
         break;
       case 'hero_card': copy('title'); copy('subtitle'); copy('text'); copy('image_url'); copy('buttons'); break;
       case 'carousel': copy('cards'); break;
-      case 'form': copy('fields'); break;
+      case 'form':
+        // Nuevo esquema: soportar modo y dinámicos
+        node.mode = n.mode || (Array.isArray(n.fields) ? 'static' : 'dynamic');
+        if (node.mode === 'dynamic') {
+          // preferir raíz snake_case
+          if (n.fields_source || n.FieldsSource || n.provider?.source_list) {
+            node.fields_source = n.fields_source || n.FieldsSource || n.provider?.source_list || '';
+          } else {
+            node.fields_source = '';
+          }
+          if (n.filter_expr) node.filter_expr = n.filter_expr;
+          if (n.sort_expr) node.sort_expr = n.sort_expr;
+          node.fields = [];
+        } else {
+          copy('fields');
+        }
+        if (n.save_as) node.save_as = n.save_as;
+        break;
       case 'file_upload': copy('accept'); copy('max_size'); copy('save_as'); break;
       case 'json_export': copy('filename'); copy('description'); copy('template'); break;
       case 'file_download': copy('file_url'); copy('filename'); copy('description'); break;
@@ -171,7 +188,7 @@
           node.value = n.value || '';
         }
         break;
-      case 'condition': node.expr = n.expr || ''; node.true_target = n.true_target || null; node.false_target = n.false_target || null; if (n.variables) node.variables = JSON.parse(JSON.stringify(n.variables)); break;
+      case 'condition': node.expr = n.expr || n.condition || ''; node.true_target = n.true_target || n.true_next || null; node.false_target = n.false_target || n.false_next || null; if (n.variables) node.variables = JSON.parse(JSON.stringify(n.variables)); break;
       case 'loop':
       case 'foreach':
         _normalizeLoop(n, node);
