@@ -1924,6 +1924,15 @@
     document.body.appendChild(modal);
   }
 
+  function closeSimulatorModal() {
+    const modal = $('simulatorModal');
+    if (modal) {
+      modal.classList.add('hidden');
+      modal.setAttribute('aria-hidden', 'true');
+      modal.style.display = 'none';
+    }
+  }
+
   function setupUiBindings() {
     const openBtn = $('btnOpenInSimulator'); if (openBtn) openBtn.addEventListener('click', () => { try { loadFlowFromEditor(); initState(); renderPreview(); } catch (e) { console.error(e); } });
     const openModalBtn = $('btnOpenSimulatorModal');
@@ -1940,6 +1949,10 @@
         } catch (e) { /* silent */ }
       });
     }
+
+    // Bind close button globally
+    const closeSimBtn = $('simulatorModalClose');
+    if (closeSimBtn) closeSimBtn.addEventListener('click', closeSimulatorModal);
 
     // NOTE: no global 'always' delegated listener to avoid duplicate openings when the button exists
 
@@ -2017,7 +2030,9 @@
     modal.classList.remove('hidden'); modal.setAttribute('aria-hidden', 'false');
     modal.style.display = 'flex';
     console.log('Modal should be visible now, classes:', modal.className);
-    const close = $('simulatorModalClose'); if (close) close.onclick = () => { closeSimulatorModal(); };
+
+    // close button is now bound in setupUiBindings
+
     const speedBtn = $('btnToggleSpeed'); if (speedBtn) { speedBtn.onclick = () => { fastMode = !fastMode; speedBtn.classList.toggle('bg-sky-600', fastMode); speedBtn.classList.toggle('text-white', fastMode); speedBtn.textContent = fastMode ? 'Normal' : 'Rápido'; }; }
     const httpBtn = $('btnToggleHttp'); if (httpBtn) { httpBtn.onclick = () => { useRealHttp = !useRealHttp; httpBtn.classList.toggle('bg-sky-600', useRealHttp); httpBtn.classList.toggle('text-white', useRealHttp); httpBtn.textContent = useRealHttp ? 'HTTP Mock' : 'HTTP Real'; }; }
     // preferencia: seguir editor
@@ -2065,7 +2080,7 @@
         try { if (typeof localStorage !== 'undefined') localStorage.setItem('simulator.showDiffs', showDiffs ? '1' : '0'); } catch (_e) { }
       });
     }
-    function closeSimulatorModal() { modal.classList.add('hidden'); modal.setAttribute('aria-hidden', 'true'); modal.style.display = 'none'; }
+
     document.addEventListener('keydown', function escHandler(ev) { if (ev.key === 'Escape') { closeSimulatorModal(); document.removeEventListener('keydown', escHandler); } });
     // bind vars button
     const btnToggleVars = $('btnToggleVars'); if (btnToggleVars) btnToggleVars.onclick = () => toggleVarsPanel();

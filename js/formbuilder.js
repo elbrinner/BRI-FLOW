@@ -7,9 +7,9 @@ const FormBuilder = (() => {
   // Helpers simples para crear inputs DOM
   function el(tag, attrs = {}, children = []) {
     const e = document.createElement(tag);
-    Object.entries(attrs).forEach(([k,v]) => {
-      if(k === 'class') e.className = v;
-      else if(k === 'text') e.textContent = v;
+    Object.entries(attrs).forEach(([k, v]) => {
+      if (k === 'class') e.className = v;
+      else if (k === 'text') e.textContent = v;
       else e.setAttribute(k, v);
     });
     children.forEach(c => e.appendChild(c));
@@ -18,7 +18,7 @@ const FormBuilder = (() => {
 
   // Factory to create mouse handlers for variable items (keeps nesting shallow)
   function createVarClickHandler(name, insertFn, hideFn) {
-    return function(ev) {
+    return function (ev) {
       ev.preventDefault();
       try { insertFn(name); } catch (e) { console.warn('insertVar failed', e); }
       try { hideFn(); } catch (e) { console.warn('hideFn failed', e); }
@@ -26,18 +26,18 @@ const FormBuilder = (() => {
   }
 
   // Crea label + input row
-  function inputRow({label, id, type='text', value='', placeholder=''}) {
-    const row = el('div',{class:'form-row'});
-    row.appendChild(el('label',{text:label}));
-    if(type === 'textarea') {
-      const ta = el('textarea',{id});
+  function inputRow({ label, id, type = 'text', value = '', placeholder = '' }) {
+    const row = el('div', { class: 'form-row' });
+    row.appendChild(el('label', { text: label }));
+    if (type === 'textarea') {
+      const ta = el('textarea', { id });
       ta.value = value || '';
       ta.placeholder = placeholder;
       // Deshabilitar autocompletado del navegador en todos los textarea
-      try { ta.setAttribute('autocomplete', 'off'); } catch(_) {}
+      try { ta.setAttribute('autocomplete', 'off'); } catch (_) { }
       row.appendChild(ta);
     } else {
-      const inp = el('input',{id, type});
+      const inp = el('input', { id, type });
       inp.value = value || '';
       inp.placeholder = placeholder || '';
       row.appendChild(inp);
@@ -45,29 +45,29 @@ const FormBuilder = (() => {
     return row;
   }
 
-  function arrayRow({label, id, value=[]}) {
-    const row = el('div',{class:'form-row'});
-    row.appendChild(el('label',{text:label}));
-    const ta = el('textarea',{id});
+  function arrayRow({ label, id, value = [] }) {
+    const row = el('div', { class: 'form-row' });
+    row.appendChild(el('label', { text: label }));
+    const ta = el('textarea', { id });
     if (Array.isArray(value)) ta.value = value.join('\n');
     else ta.value = value ? String(value) : '';
     ta.placeholder = 'Una línea por elemento (para listas simples)';
     // Deshabilitar autocompletado del navegador
-    try { ta.setAttribute('autocomplete', 'off'); } catch(_) {}
+    try { ta.setAttribute('autocomplete', 'off'); } catch (_) { }
     row.appendChild(ta);
     return row;
   }
 
-  function jsonEditor({label, id, value={}}) {
-    const row = el('div',{class:'form-row'});
-    row.appendChild(el('label',{text:label}));
-    const ta = el('textarea',{id});
+  function jsonEditor({ label, id, value = {} }) {
+    const row = el('div', { class: 'form-row' });
+    row.appendChild(el('label', { text: label }));
+    const ta = el('textarea', { id });
     ta.value = JSON.stringify(value, null, 2);
     ta.placeholder = 'Objeto JSON (edítalo si necesitas estructura más compleja)';
     // Deshabilitar autocompletado del navegador
-    try { ta.setAttribute('autocomplete', 'off'); } catch(_) {}
+    try { ta.setAttribute('autocomplete', 'off'); } catch (_) { }
     row.appendChild(ta);
-    const msg = el('div',{class:'json-error', 'aria-live':'polite'});
+    const msg = el('div', { class: 'json-error', 'aria-live': 'polite' });
     msg.style.color = '#b00020'; msg.style.fontSize = '12px'; msg.style.minHeight = '1.2em'; msg.style.marginTop = '4px';
     row.appendChild(msg);
     ta.addEventListener('input', () => {
@@ -77,8 +77,8 @@ const FormBuilder = (() => {
   }
 
   function createTypeSelect(selected, index) {
-    const typeSel = el('select',{'data-field':'type','data-index': String(index)});
-    const types = ['text','email','select','textarea','file'];
+    const typeSel = el('select', { 'data-field': 'type', 'data-index': String(index) });
+    const types = ['text', 'email', 'select', 'textarea', 'file'];
     for (let t of types) {
       const opt = document.createElement('option');
       opt.value = t; opt.textContent = t; if (t === selected) opt.selected = true;
@@ -87,47 +87,47 @@ const FormBuilder = (() => {
     return typeSel;
   }
 
-  function fieldsEditor({label, id, fields=[]}) {
-    const row = el('div',{class:'form-row'});
-    row.appendChild(el('label',{text:label}));
-    const container = el('div',{id: id + '_container'});
-    const list = el('div',{class:'fields-list'});
+  function fieldsEditor({ label, id, fields = [] }) {
+    const row = el('div', { class: 'form-row' });
+    row.appendChild(el('label', { text: label }));
+    const container = el('div', { id: id + '_container' });
+    const list = el('div', { class: 'fields-list' });
     container.appendChild(list);
-    const addBtn = el('button',{
-      type:'button',
-      text:'Añadir campo',
-      class:'mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition w-fit text-sm font-semibold shadow-sm'
+    const addBtn = el('button', {
+      type: 'button',
+      text: 'Añadir campo',
+      class: 'mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition w-fit text-sm font-semibold shadow-sm'
     });
     addBtn.addEventListener('click', onAddField);
     container.appendChild(addBtn);
 
     function onAddField() {
-      fields.push({name:'campo', type:'text', label:'Etiqueta', required:false});
+      fields.push({ name: 'campo', type: 'text', label: 'Etiqueta', required: false });
       renderList();
     }
 
     function renderList() {
       list.innerHTML = '';
       fields.forEach((f, i) => {
-        const item = el('div',{class:'field-item', 'data-index': String(i)});
-        item.style.border = '1px solid #eee'; item.style.padding='6px'; item.style.marginBottom='6px';
-        item.appendChild(el('div',{text:`#${i+1} - ${f.name}`}));
-        const name = el('input',{type:'text', value: f.name, 'data-field': 'name', 'data-index': String(i)});
-        const labelInp = el('input',{type:'text', value: f.label, 'data-field': 'label', 'data-index': String(i)});
+        const item = el('div', { class: 'field-item', 'data-index': String(i) });
+        item.style.border = '1px solid #eee'; item.style.padding = '6px'; item.style.marginBottom = '6px';
+        item.appendChild(el('div', { text: `#${i + 1} - ${f.name}` }));
+        const name = el('input', { type: 'text', value: f.name, 'data-field': 'name', 'data-index': String(i) });
+        const labelInp = el('input', { type: 'text', value: f.label, 'data-field': 'label', 'data-index': String(i) });
         const typeSel = createTypeSelect(f.type, i);
-        const req = el('input',{type:'checkbox', 'data-field':'required', 'data-index': String(i)});
+        const req = el('input', { type: 'checkbox', 'data-field': 'required', 'data-index': String(i) });
         req.checked = !!f.required;
-        const remove = el('button',{
-          type:'button',
-          text:'Eliminar',
-          'data-action':'remove',
+        const remove = el('button', {
+          type: 'button',
+          text: 'Eliminar',
+          'data-action': 'remove',
           'data-index': String(i),
-          class:'ml-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold shadow-sm'
+          class: 'ml-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold shadow-sm'
         });
-        item.appendChild(el('div',{},[el('label',{text:'name:'}), name]));
-        item.appendChild(el('div',{},[el('label',{text:'label:'}), labelInp]));
-        item.appendChild(el('div',{},[el('label',{text:'type:'}), typeSel]));
-        item.appendChild(el('div',{},[el('label',{text:'required:'}), req]));
+        item.appendChild(el('div', {}, [el('label', { text: 'name:' }), name]));
+        item.appendChild(el('div', {}, [el('label', { text: 'label:' }), labelInp]));
+        item.appendChild(el('div', {}, [el('label', { text: 'type:' }), typeSel]));
+        item.appendChild(el('div', {}, [el('label', { text: 'required:' }), req]));
         item.appendChild(remove);
         list.appendChild(item);
       });
@@ -173,7 +173,7 @@ const FormBuilder = (() => {
       if (action === 'remove' && idx != null) {
         const i = Number(idx);
         if (!fields[i]) return;
-        fields.splice(i,1);
+        fields.splice(i, 1);
         renderList();
       }
     });
@@ -184,38 +184,38 @@ const FormBuilder = (() => {
   }
 
   // Editor por filas para mappings [{name, path}]
-  function mappingsEditor({label, id, mappings=[]}) {
-    const row = el('div',{class:'form-row'});
-    row.appendChild(el('label',{text:label}));
-    const container = el('div',{id: id + '_container', class:'mappings-container'});
-    const list = el('div',{class:'mappings-list'});
+  function mappingsEditor({ label, id, mappings = [] }) {
+    const row = el('div', { class: 'form-row' });
+    row.appendChild(el('label', { text: label }));
+    const container = el('div', { id: id + '_container', class: 'mappings-container' });
+    const list = el('div', { class: 'mappings-list' });
     container.appendChild(list);
-    const addBtn = el('button',{
-      type:'button',
-      text:'Añadir mapeo',
-      class:'mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition w-fit text-sm font-semibold shadow-sm'
+    const addBtn = el('button', {
+      type: 'button',
+      text: 'Añadir mapeo',
+      class: 'mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition w-fit text-sm font-semibold shadow-sm'
     });
     addBtn.addEventListener('click', onAdd);
     container.appendChild(addBtn);
 
-  function onAdd() { mappings.push({ name: '', path: '', type: '' }); renderList(); }
+    function onAdd() { mappings.push({ name: '', path: '', type: '' }); renderList(); }
 
     function renderList() {
       list.innerHTML = '';
       mappings.forEach((m, i) => {
-        const item = el('div',{class:'mapping-item', 'data-index': String(i)});
+        const item = el('div', { class: 'mapping-item', 'data-index': String(i) });
         item.style.display = 'flex'; item.style.gap = '8px'; item.style.marginBottom = '6px';
-  const nameInp = el('input', { type: 'text', value: m.name, 'data-field':'name', 'data-index': String(i), placeholder: 'variable o variable.propiedad' });
-  const pathInp = el('input', { type: 'text', value: m.path, 'data-field':'path', 'data-index': String(i), placeholder: 'ruta JSON (ej: data.items[0].id)' });
-  const typeInp = el('input', { type: 'text', value: m.type || '', 'data-field':'type', 'data-index': String(i), placeholder: 'type (opcional)'});
-        const remove = el('button',{
-          type:'button',
-          text:'Eliminar',
-          'data-action':'remove',
+        const nameInp = el('input', { type: 'text', value: m.name, 'data-field': 'name', 'data-index': String(i), placeholder: 'variable o variable.propiedad' });
+        const pathInp = el('input', { type: 'text', value: m.path, 'data-field': 'path', 'data-index': String(i), placeholder: 'ruta JSON (ej: data.items[0].id)' });
+        const typeInp = el('input', { type: 'text', value: m.type || '', 'data-field': 'type', 'data-index': String(i), placeholder: 'type (opcional)' });
+        const remove = el('button', {
+          type: 'button',
+          text: 'Eliminar',
+          'data-action': 'remove',
           'data-index': String(i),
-          class:'ml-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold shadow-sm'
+          class: 'ml-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold shadow-sm'
         });
-  item.appendChild(nameInp); item.appendChild(pathInp); item.appendChild(typeInp); item.appendChild(remove);
+        item.appendChild(nameInp); item.appendChild(pathInp); item.appendChild(typeInp); item.appendChild(remove);
         // attach autocomplete for variable names if helper available
         // if (window.FormBuilderHelpers?.attachVarAutocomplete) {
         //   try { window.FormBuilderHelpers.attachVarAutocomplete(nameInp, { format: 'mustache' }); } catch(e) { console.warn('attachVarAutocomplete failed for mapping name', e); }
@@ -244,29 +244,30 @@ const FormBuilder = (() => {
       if (action === 'remove' && idx != null) {
         const i = Number(idx);
         if (!mappings[i]) return;
-        mappings.splice(i,1);
+        mappings.splice(i, 1);
         renderList();
       }
     });
 
     renderList(); row.appendChild(container);
-    row.getValue = () => mappings.map(m => ({ name: (m.name||'').trim(), path: (m.path||'').trim(), type: (m.type||'').trim() })).filter(mm => mm.name && mm.path);
+    row.getValue = () => mappings.map(m => ({ name: (m.name || '').trim(), path: (m.path || '').trim(), type: (m.type || '').trim() })).filter(mm => mm.name && mm.path);
     return row;
   }
 
-  // Editor para variables en nodo start [{name, defaultValue, isList}]
+  // Editor para variables en nodo start [{name, defaultValue, isList, type}]
   function variablesEditor({ label, id, variables = [] }) {
-  const row = el('div', { class: 'form-row' });
-  row.appendChild(el('label', { text: label, class: 'block text-sm font-medium text-gray-700 mb-2' }));
-  const container = el('div', { id: id + '_container', class: 'variables-container flex flex-col gap-2' });
-  const list = el('div', { class: 'variables-list flex flex-col gap-2' });
-  container.appendChild(list);
-  const addBtn = el('button', {
-    type: 'button',
-    text: 'Añadir variable',
-    class: 'mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition w-fit text-sm font-semibold shadow-sm'
-  });
-  addBtn.addEventListener('click', () => { variables.push({ name: '', defaultValue: '', isList: false }); renderList(); });
+    const row = el('div', { class: 'form-row' });
+    row.appendChild(el('label', { text: label, class: 'block text-sm font-medium text-gray-700 mb-2' }));
+    const container = el('div', { id: id + '_container', class: 'variables-container flex flex-col gap-2' });
+    const list = el('div', { class: 'variables-list flex flex-col gap-2' });
+    container.appendChild(list);
+    const addBtn = el('button', {
+      type: 'button',
+      text: 'Añadir variable',
+      class: 'mt-2 px-3 py-1 bg-blue-600 text-white rounded hover:bg-blue-700 transition w-fit text-sm font-semibold shadow-sm'
+    });
+    // Default type is 'string' if not specified
+    addBtn.addEventListener('click', () => { variables.push({ name: '', defaultValue: '', isList: false, type: 'string' }); renderList(); });
 
     function findDuplicateNames() {
       const counter = {};
@@ -275,7 +276,7 @@ const FormBuilder = (() => {
         counter[n] = (counter[n] || 0) + 1;
       });
       const dups = new Set();
-      Object.entries(counter).forEach(([k,v]) => { if (v > 1) dups.add(k); });
+      Object.entries(counter).forEach(([k, v]) => { if (v > 1) dups.add(k); });
       return dups;
     }
 
@@ -283,40 +284,117 @@ const FormBuilder = (() => {
       list.innerHTML = '';
       const dupSet = findDuplicateNames();
       variables.forEach((v, i) => {
+        // Ensure type exists (migration for old vars)
+        if (!v.type) v.type = 'string';
+
         const item = el('div', { class: 'variable-item flex items-center gap-2 bg-white rounded shadow-sm p-2', 'data-index': String(i) });
         const wrapper = el('div', { class: 'flex flex-col gap-1 flex-1' });
-        // Nombre
-        const nameLabel = el('label', { text: 'Nombre', class: 'text-xs text-gray-600' });
+
+        // Row 1: Name and Type
+        const row1 = el('div', { class: 'flex gap-2' });
+
+        // Name
+        const nameGroup = el('div', { class: 'flex-1' });
+        const nameLabel = el('label', { text: 'Nombre', class: 'text-xs text-gray-600 block' });
         const nameInp = el('input', {
           type: 'text',
           value: v.name,
           'data-field': 'name',
           'data-index': String(i),
           placeholder: 'nombre',
-          class: 'border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400'
+          class: 'w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400'
         });
-        // Duplicado
         if (dupSet.has((v.name || '').trim())) {
-          const warn = el('div', { text: '¡Nombre duplicado!', class: 'text-xs text-red-600 ml-2' }, []);
-          wrapper.appendChild(warn);
           nameInp.className += ' border-red-500';
+          const warn = el('div', { text: '¡Duplicado!', class: 'text-xs text-red-600' });
+          nameGroup.appendChild(warn);
         }
-        wrapper.appendChild(nameLabel);
-        wrapper.appendChild(nameInp);
-        // Valor por defecto
-        const defLabel = el('label', { text: 'Valor por defecto', class: 'text-xs text-gray-600' });
-        const defInp = el('input', {
-          type: 'text',
-          value: v.defaultValue,
-          'data-field': 'defaultValue',
+        nameGroup.appendChild(nameLabel);
+        nameGroup.appendChild(nameInp);
+        row1.appendChild(nameGroup);
+
+        // Type
+        const typeGroup = el('div', { class: 'w-24' });
+        const typeLabel = el('label', { text: 'Tipo', class: 'text-xs text-gray-600 block' });
+        const typeSel = el('select', {
+          'data-field': 'type',
           'data-index': String(i),
-          placeholder: 'valor por defecto',
-          class: 'border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400'
+          class: 'w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400'
         });
-        wrapper.appendChild(defLabel);
-        wrapper.appendChild(defInp);
-        // isList
-        const isListRow = el('div', { class: 'flex items-center gap-2' });
+        ['string', 'boolean', 'number', 'json'].forEach(t => {
+          const opt = el('option', { value: t, text: t });
+          if (v.type === t) opt.selected = true;
+          typeSel.appendChild(opt);
+        });
+        typeGroup.appendChild(typeLabel);
+        typeGroup.appendChild(typeSel);
+        row1.appendChild(typeGroup);
+
+        wrapper.appendChild(row1);
+
+        // Row 2: Value (dynamic input based on type)
+        const row2 = el('div', { class: 'mt-1' });
+        const defLabel = el('label', { text: 'Valor por defecto', class: 'text-xs text-gray-600 block' });
+        row2.appendChild(defLabel);
+
+        let inputControl;
+        if (v.type === 'boolean') {
+          inputControl = el('select', {
+            'data-field': 'defaultValue',
+            'data-index': String(i),
+            class: 'w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400'
+          });
+          const optTrue = el('option', { value: 'true', text: 'True' });
+          const optFalse = el('option', { value: 'false', text: 'False' });
+          if (v.defaultValue === true || String(v.defaultValue) === 'true') optTrue.selected = true;
+          else optFalse.selected = true;
+          inputControl.appendChild(optTrue);
+          inputControl.appendChild(optFalse);
+
+        } else if (v.type === 'number') {
+          inputControl = el('input', {
+            type: 'number',
+            value: v.defaultValue,
+            'data-field': 'defaultValue',
+            'data-index': String(i),
+            placeholder: '0',
+            class: 'w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400'
+          });
+
+        } else if (v.type === 'json') {
+          inputControl = el('textarea', {
+            'data-field': 'defaultValue',
+            'data-index': String(i),
+            placeholder: '{"key": "value"}',
+            class: 'w-full border border-gray-300 rounded px-2 py-1 text-sm font-mono focus:outline-none focus:ring-2 focus:ring-blue-400',
+            rows: '2'
+          });
+          // If it's an object, stringify it for display
+          let valStr = '';
+          if (typeof v.defaultValue === 'object' && v.defaultValue !== null) {
+            valStr = JSON.stringify(v.defaultValue);
+          } else {
+            valStr = String(v.defaultValue || '');
+          }
+          inputControl.value = valStr;
+
+        } else {
+          // String (default)
+          inputControl = el('input', {
+            type: 'text',
+            value: v.defaultValue,
+            'data-field': 'defaultValue',
+            'data-index': String(i),
+            placeholder: 'texto',
+            class: 'w-full border border-gray-300 rounded px-2 py-1 text-sm focus:outline-none focus:ring-2 focus:ring-blue-400'
+          });
+        }
+
+        row2.appendChild(inputControl);
+        wrapper.appendChild(row2);
+
+        // Row 3: Options (isList)
+        const row3 = el('div', { class: 'flex items-center gap-2 mt-1' });
         const isListChk = el('input', {
           type: 'checkbox',
           'data-field': 'isList',
@@ -324,17 +402,20 @@ const FormBuilder = (() => {
           class: 'form-checkbox h-4 w-4 text-blue-600'
         });
         isListChk.checked = !!v.isList;
-        isListRow.appendChild(isListChk);
-        isListRow.appendChild(el('label', { text: 'Lista', class: 'text-xs text-gray-600' }));
-        wrapper.appendChild(isListRow);
+        row3.appendChild(isListChk);
+        row3.appendChild(el('label', { text: 'Es Lista', class: 'text-xs text-gray-600' }));
+        wrapper.appendChild(row3);
+
         item.appendChild(wrapper);
-        // Botón eliminar
+
+        // Remove button
         const remove = el('button', {
           type: 'button',
-          text: 'Eliminar',
+          text: '✕',
           'data-action': 'remove',
           'data-index': String(i),
-          class: 'ml-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600 transition text-xs font-semibold shadow-sm'
+          title: 'Eliminar variable',
+          class: 'ml-2 px-2 py-1 bg-red-100 text-red-600 rounded hover:bg-red-200 transition text-sm font-bold'
         });
         item.appendChild(remove);
         list.appendChild(item);
@@ -348,12 +429,30 @@ const FormBuilder = (() => {
       if (idx == null || !field) return;
       const i = Number(idx);
       if (!variables[i]) return;
-      if (field === 'isList') return;
+
+      // Handle type change: reset value if type changes to avoid confusion? 
+      // For now, keep value but it might look weird.
+      if (field === 'type') {
+        variables[i].type = target.value;
+        // Reset default value to sensible default for new type
+        if (target.value === 'boolean') variables[i].defaultValue = false;
+        else if (target.value === 'number') variables[i].defaultValue = 0;
+        else if (target.value === 'json') variables[i].defaultValue = {};
+        else variables[i].defaultValue = '';
+        renderList(); // Re-render to show correct input control
+        return;
+      }
+
+      if (field === 'isList') return; // handled in change
+
       variables[i][field] = target.value;
-      // Solo re-render si hay duplicados
-      const dupSet = findDuplicateNames();
-      if (dupSet.size > 0) {
-        renderList();
+
+      // Re-render only if name changed (for dup check)
+      if (field === 'name') {
+        const dupSet = findDuplicateNames();
+        if (dupSet.size > 0 || target.classList.contains('border-red-500')) {
+          renderList();
+        }
       }
     });
 
@@ -364,9 +463,20 @@ const FormBuilder = (() => {
       if (idx == null || !field) return;
       const i = Number(idx);
       if (!variables[i]) return;
-      if (target.type === 'checkbox') variables[i][field] = !!target.checked;
-      else variables[i][field] = target.value;
-      renderList();
+
+      if (target.type === 'checkbox') {
+        variables[i][field] = !!target.checked;
+      } else if (field === 'type') {
+        // Already handled in input event for select, but just in case
+        variables[i].type = target.value;
+        if (target.value === 'boolean') variables[i].defaultValue = false;
+        else if (target.value === 'number') variables[i].defaultValue = 0;
+        else if (target.value === 'json') variables[i].defaultValue = {};
+        else variables[i].defaultValue = '';
+        renderList();
+      } else {
+        variables[i][field] = target.value;
+      }
     });
 
     list.addEventListener('click', (ev) => {
@@ -381,10 +491,34 @@ const FormBuilder = (() => {
       }
     });
 
-  renderList();
-  container.appendChild(addBtn);
-  row.appendChild(container);
-    row.getValue = () => variables.map(v => ({ name: (v.name || '').trim(), defaultValue: (v.defaultValue || '').trim(), isList: !!v.isList })).filter(vv => vv.name);
+    renderList();
+    container.appendChild(addBtn);
+    row.appendChild(container);
+
+    row.getValue = () => variables.map(v => {
+      let val = v.defaultValue;
+      // Convert value based on type
+      if (v.type === 'boolean') {
+        val = (String(val) === 'true');
+      } else if (v.type === 'number') {
+        val = Number(val);
+        if (isNaN(val)) val = 0;
+      } else if (v.type === 'json') {
+        try {
+          if (typeof val === 'string') val = JSON.parse(val);
+        } catch (e) { /* keep as string if parse fails, or set null? */ }
+      } else {
+        val = (val || '').trim();
+      }
+
+      return {
+        name: (v.name || '').trim(),
+        defaultValue: val,
+        isList: !!v.isList,
+        type: v.type || 'string'
+      };
+    }).filter(vv => vv.name);
+
     return row;
   }
 
@@ -398,10 +532,10 @@ const FormBuilder = (() => {
     mappingsEditor,
     variablesEditor,
     // attach simple autocomplete for variables. options: { format: 'mustache'|'context'|'dollar' }
-    attachVarAutocomplete: function(input, options = {}) {
+    attachVarAutocomplete: function (input, options = {}) {
       if (!input) return;
       // No aplicar autocompletado a textareas para evitar problemas de ancho y UX
-      try { if ((input.tagName || '').toUpperCase() === 'TEXTAREA') return; } catch(_) {}
+      try { if ((input.tagName || '').toUpperCase() === 'TEXTAREA') return; } catch (_) { }
       // create wrapper to position suggestions
       const wrapper = el('div', { style: 'display:inline-block; position:relative;' });
       // move input into wrapper
@@ -486,7 +620,7 @@ const FormBuilder = (() => {
         input.value = val.slice(0, start) + name + val.slice(end);
         input.focus();
         const pos = start + name.length;
-  try { input.setSelectionRange(pos, pos); } catch (e) { console.warn('setSelectionRange failed', e); }
+        try { input.setSelectionRange(pos, pos); } catch (e) { console.warn('setSelectionRange failed', e); }
         input.dispatchEvent(new Event('input', { bubbles: true }));
       }
 
@@ -617,10 +751,10 @@ const FormBuilder = (() => {
     const variant = container.querySelector('#button_variant')?.value || 'primary';
     const optional = !!container.querySelector('#btn_optional')?.checked;
     let save_as = (container.querySelector('#btn_save_as input, #btn_save_as')?.value || '').trim();
-    if(!save_as){
+    if (!save_as) {
       // default sugerido igual que en renderer: selected_button_<nodeId>
-  const nid = window.App?.state?.selectedNodeId || window.App?.state?.editingNode?.id || null;
-      if(nid) save_as = `selected_button_${nid}`;
+      const nid = window.App?.state?.selectedNodeId || window.App?.state?.editingNode?.id || null;
+      if (nid) save_as = `selected_button_${nid}`;
     }
 
     let next = null;
@@ -656,21 +790,21 @@ const FormBuilder = (() => {
         let firstLabel = '';
         try {
           if (labelInputs && labelInputs.length) firstLabel = (labelInputs[0].value || '').trim();
-        } catch(_) {}
+        } catch (_) { }
         // read per-option value if present
         const valueInput = item.querySelector('input[id^="button_value_"]');
         const optValue = valueInput ? (valueInput.value || '') : '';
         // read per-option variant if present
         const varSel = item.querySelector('select[id^="button_variant_"]');
         const optVariant = varSel ? (varSel.value || 'primary') : undefined;
-    // read per-option target from dedicated selects (flow + node)
-  const tgtFlowSel = item.querySelector('select[id^="button_tgt_flow_"]');
-  // pick the node selector, not the flow one
-  const tgtSel = item.querySelector('select[id^="button_tgt_"]:not([id^="button_tgt_flow_"])');
-    let next = null;
-    const tgtNodeId = tgtSel?.value || '';
-    const tgtFlowId = tgtFlowSel?.value || '';
-    if (tgtNodeId || tgtFlowId) { next = { flow_id: tgtFlowId, node_id: tgtNodeId }; }
+        // read per-option target from dedicated selects (flow + node)
+        const tgtFlowSel = item.querySelector('select[id^="button_tgt_flow_"]');
+        // pick the node selector, not the flow one
+        const tgtSel = item.querySelector('select[id^="button_tgt_"]:not([id^="button_tgt_flow_"])');
+        let next = null;
+        const tgtNodeId = tgtSel?.value || '';
+        const tgtFlowId = tgtFlowSel?.value || '';
+        if (tgtNodeId || tgtFlowId) { next = { flow_id: tgtFlowId, node_id: tgtNodeId }; }
         // Keep both shapes for maximum compatibility across normalizers/exporters
         const target = next ? { flow_id: next.flow_id, node_id: next.node_id } : null;
         const hasLabel = Object.values(optI18n).some((v) => {
@@ -762,7 +896,7 @@ const FormBuilder = (() => {
           if (current && Array.isArray(current.options)) {
             out.options = JSON.parse(JSON.stringify(current.options));
           }
-        } catch(e) { /* noop */ }
+        } catch (e) { /* noop */ }
       }
     }
 
@@ -802,7 +936,7 @@ const FormBuilder = (() => {
     try {
       const raw = container.querySelector('#rest_mock')?.value || '';
       if (raw && raw.trim() !== '') mock = safeParse(raw, undefined);
-    } catch(e) { console.warn('readRestCall: invalid JSON in rest_mock', e); mock = undefined; }
+    } catch (e) { console.warn('readRestCall: invalid JSON in rest_mock', e); mock = undefined; }
     // mappings editor returns [{name,path,type}] but stored JSON uses {source,target,type}
     let mappings = [];
     const mappingsContainer = container.querySelector('#rest_mappings_container');
@@ -810,7 +944,7 @@ const FormBuilder = (() => {
       const possibleRow = mappingsContainer.closest('.form-row') || mappingsContainer.parentElement;
       if (possibleRow && typeof possibleRow.getValue === 'function') mappings = possibleRow.getValue();
     }
-    if(!Array.isArray(mappings)) {
+    if (!Array.isArray(mappings)) {
       const mappingsRaw = container.querySelector('#rest_mappings')?.value || '[]';
       mappings = safeParse(mappingsRaw, []);
     }
@@ -1036,8 +1170,8 @@ const FormBuilder = (() => {
     if (retry_raw !== '') runtime.retry_count = Number(retry_raw);
     const hasRuntime = Object.keys(runtime).length > 0;
     // Construir salida condicional según el perfil
-  const base = { agent_profile, message, save_as };
-    function withCommonLLM(obj){
+    const base = { agent_profile, message, save_as };
+    function withCommonLLM(obj) {
       obj.model = model;
       if (system_prompt) obj.system_prompt = system_prompt;
       if (stream) obj.stream = true; else obj.stream = false; // mantener explícito para UI
@@ -1046,7 +1180,7 @@ const FormBuilder = (() => {
       if (hasRuntime) obj.runtime = runtime;
       return obj;
     }
-    switch((agent_profile || 'normal')){
+    switch ((agent_profile || 'normal')) {
       case 'rag': {
         const out = withCommonLLM({ ...base });
         // incluir bloque de búsqueda solo en RAG
@@ -1097,15 +1231,15 @@ const FormBuilder = (() => {
   // simplified renderPropsFor delegator (keeps file small)
   function renderPropsFor(node, container, nodeIds = []) {
     container.innerHTML = '';
-    if(!node) return;
-    if(window.FormRenderers && typeof window.FormRenderers.renderFor === 'function') {
+    if (!node) return;
+    if (window.FormRenderers && typeof window.FormRenderers.renderFor === 'function') {
       window.FormRenderers.renderFor(node, container, nodeIds);
     } else {
-      container.appendChild(jsonEditor({label:'Props (JSON libre)', id:'props_raw', value: node.props || {}}));
+      container.appendChild(jsonEditor({ label: 'Props (JSON libre)', id: 'props_raw', value: node.props || {} }));
     }
-  // next selector para tipos que usan "next"; ocultar en nodes que no lo usan (choice, condition, button, flow_jump, end)
-  if (node.type !== 'choice' && node.type !== 'condition' && node.type !== 'button' && node.type !== 'flow_jump' && node.type !== 'end') {
-    const nextRow = el('div', { class: 'form-row', 'data-role': 'next' });
+    // next selector para tipos que usan "next"; ocultar en nodes que no lo usan (choice, condition, button, flow_jump, end)
+    if (node.type !== 'choice' && node.type !== 'condition' && node.type !== 'button' && node.type !== 'flow_jump' && node.type !== 'end') {
+      const nextRow = el('div', { class: 'form-row', 'data-role': 'next' });
       nextRow.appendChild(el('label', { text: 'Siguiente (flujo · nodo)' }));
       // flujo destino
       const flowSel = el('select', { id: 'next_flow', 'data-original': (node.next?.flow_id || '') });
@@ -1133,10 +1267,10 @@ const FormBuilder = (() => {
       if (initialNextFlowId) flowSel.value = initialNextFlowId;
       // nodo destino dependiente
       const nodeSel = el('select', { id: 'next_node', 'data-original': (node.next?.node_id || '') });
-      function refreshNodeSel(){
+      function refreshNodeSel() {
         const fid = flowSel.value || activeId || '';
-  const proj = window.AppProject || {};
-  const nodesDict = proj.flows?.[fid]?.nodes || (window.App?.state?.nodes || {});
+        const proj = window.AppProject || {};
+        const nodesDict = proj.flows?.[fid]?.nodes || (window.App?.state?.nodes || {});
         const currentVal = nodeSel.value;
         nodeSel.innerHTML = '';
         nodeSel.appendChild(el('option', { value: '', text: '(ninguno / start)' }));
@@ -1155,17 +1289,17 @@ const FormBuilder = (() => {
       const goBtn = el('button', { type: 'button', text: 'Ir al destino' });
       goBtn.className = 'ml-2 px-2 py-1 bg-white border rounded text-sm';
       goBtn.addEventListener('click', () => {
-        try{
+        try {
           const fid = flowSel.value || window.AppProject?.active_flow_id || '';
           const nid = nodeSel.value || (window.AppProject?.flows?.[fid]?.meta?.start_node || window.App?.state?.meta?.start_node || '');
-          if(!fid) return alert('Selecciona un flujo destino');
-          if(window.AppProject?.flows?.[fid]){
+          if (!fid) return alert('Selecciona un flujo destino');
+          if (window.AppProject?.flows?.[fid]) {
             const f = window.AppProject.flows[fid];
-            if(window.App && typeof window.App.importJson === 'function') window.App.importJson({ flow_id: fid, meta: f.meta, nodes: f.nodes });
+            if (window.App && typeof window.App.importJson === 'function') window.App.importJson({ flow_id: fid, meta: f.meta, nodes: f.nodes });
             window.AppProject.active_flow_id = fid;
           }
-          if(typeof window.App?.selectNode === 'function' && nid) window.App.selectNode(nid);
-        }catch(e){ console.warn('Ir al destino (next) falló', e); }
+          if (typeof window.App?.selectNode === 'function' && nid) window.App.selectNode(nid);
+        } catch (e) { console.warn('Ir al destino (next) falló', e); }
       });
       const wrap = el('div', { style: 'display:flex; gap:8px; align-items:center;' }, [flowSel, nodeSel, goBtn]);
       nextRow.appendChild(wrap);
@@ -1175,7 +1309,7 @@ const FormBuilder = (() => {
     return function readValues() {
       let out = {};
       try {
-          switch(node.type) {
+        switch (node.type) {
           case 'response': out = readResponse(container); break;
           case 'input': out = readInput(container); break;
           case 'choice': out = readChoice(container); break;
@@ -1183,7 +1317,7 @@ const FormBuilder = (() => {
           case 'multi_button': out = readMultiButton(container); break;
           case 'rest_call': out = readRestCall(container); break;
           case 'assign_var': out = readAssignVar(container); break;
-            case 'start': out = readStart(container); break;
+          case 'start': out = readStart(container); break;
           case 'condition': out = readCondition(container); break;
           case 'set_goto': out = readSetGoto(container); break;
           case 'loop': out = readLoop(container); break;

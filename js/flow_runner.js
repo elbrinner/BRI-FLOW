@@ -1,6 +1,6 @@
 // flow_runner.js
 // Lógica principal del runner que utiliza FlowUI y ExpressionParser
-(function(){
+(function () {
   console.log('[FlowRunner] Inicializando flow runner...');
   // Contador de profundidad de bucles para generar nombres de variables sencillos y predecibles
   let loopDepth = 0;
@@ -8,7 +8,7 @@
   let flowsById = {};
   let currentFlowId = null;
 
-  function setActiveFlow(flowId){
+  function setActiveFlow(flowId) {
     if (!flowId || !flowsById[flowId]) { console.warn('[FlowRunner] setActiveFlow: flujo no encontrado', flowId); return; }
     currentFlowId = flowId;
     try {
@@ -65,7 +65,7 @@
       case 'choice': return await handleChoice(node, locale);
       case 'button': return await handleButton(node, locale);
       case 'extra': return await handleExtra(node, locale);
-  case 'assign_var': return await handleAssignVar(node);
+      case 'assign_var': return await handleAssignVar(node);
       case 'condition': return await handleCondition(node);
       case 'set_goto': return await handleSetGoto(node);
       case 'rest_call': return await handleRestCall(node);
@@ -151,7 +151,7 @@
     if (!res.cancelled) {
       // intentar parsear JSON, si falla, guardar string
       let value = res.value;
-      try { value = JSON.parse(res.value); } catch(_e) { /* keep string */ }
+      try { value = JSON.parse(res.value); } catch (_e) { /* keep string */ }
       ctx.variables['extra'] = value;
       window.FlowUI.updateContextView(card);
       await new Promise(r => setTimeout(r, 200));
@@ -176,7 +176,7 @@
           } else {
             truthy = !!rendered;
           }
-        } catch(_e) { truthy = false; }
+        } catch (_e) { truthy = false; }
         if (truthy) {
           return resolveNext(c?.target);
         }
@@ -189,7 +189,7 @@
     const prompt = node.i18n?.[locale]?.prompt || node.i18n?.es?.prompt || '';
     const opts = node.options || [];
     let buttonsHtml = '';
-    opts.forEach((o, i) => { buttonsHtml += `<button class="choiceOpt" data-idx="${i}" style="margin:6px">${o.label || o.text || ('Opción ' + (i+1))}</button>`; });
+    opts.forEach((o, i) => { buttonsHtml += `<button class="choiceOpt" data-idx="${i}" style="margin:6px">${o.label || o.text || ('Opción ' + (i + 1))}</button>`; });
     const html = `<div><div style="font-weight:700;margin-bottom:8px">Nodo choice: ${node.id}</div><div style="margin-bottom:8px">${prompt}</div><div>${buttonsHtml}</div>${contextHtml}<div style="text-align:right;margin-top:8px"><button id="runnerCancel">Cancelar</button></div></div>`;
     const { card } = window.FlowUI.showNodeUI(html);
     const res = await new Promise((resolve) => {
@@ -230,7 +230,7 @@
         try {
           let val = expr;
           if (typeof expr === 'string' && window.ExpressionParser && typeof window.ExpressionParser.evaluate === 'function') {
-            try { val = window.ExpressionParser.evaluate(expr, window.App.runtimeContext); } catch(e) { val = expr; }
+            try { val = window.ExpressionParser.evaluate(expr, window.App.runtimeContext); } catch (e) { val = expr; }
           }
           if (n) ctx.variables[n] = val;
         } catch (e) { console.warn('[FlowRunner] handleAssignVar item error', e); }
@@ -242,7 +242,7 @@
       try {
         let val = expr;
         if (typeof expr === 'string' && window.ExpressionParser && typeof window.ExpressionParser.evaluate === 'function') {
-          try { val = window.ExpressionParser.evaluate(expr, window.App.runtimeContext); } catch(e) { val = expr; }
+          try { val = window.ExpressionParser.evaluate(expr, window.App.runtimeContext); } catch (e) { val = expr; }
         }
         if (n) ctx.variables[n] = val;
       } catch (e) { console.warn('[FlowRunner] handleAssignVar error', e); }
@@ -284,14 +284,14 @@
     const ctx = window.App.runtimeContext;
     // support multiple naming conventions from JSON/C# model
     const sourceListName = node.source_list || node.Source_List || node.sourceList || node.SourceList || '';
-  // Determine item/index variable names. If node explicitly defines them, use those.
-  // Otherwise choose based on current loopDepth: outermost -> 'item'/'index', nested -> 'item1'/'index1', etc.
-  const explicitItem = node.item_var || node.Item_Var || node.itemVar || node.ItemVar;
-  const explicitIndex = node.index_var || node.Index_Var || node.indexVar || node.IndexVar;
-  const depth = loopDepth || 0;
-  const suffix = depth === 0 ? '' : String(depth);
-  const itemVar = explicitItem || ('item' + suffix);
-  const indexVar = explicitIndex || ('index' + suffix);
+    // Determine item/index variable names. If node explicitly defines them, use those.
+    // Otherwise choose based on current loopDepth: outermost -> 'item'/'index', nested -> 'item1'/'index1', etc.
+    const explicitItem = node.item_var || node.Item_Var || node.itemVar || node.ItemVar;
+    const explicitIndex = node.index_var || node.Index_Var || node.indexVar || node.IndexVar;
+    const depth = loopDepth || 0;
+    const suffix = depth === 0 ? '' : String(depth);
+    const itemVar = explicitItem || ('item' + suffix);
+    const indexVar = explicitIndex || ('index' + suffix);
     // Resolve sourceList: try variable name first, otherwise evaluate as expression (e.g. 'item.children' or 'context.x')
     let list = [];
     try {
@@ -324,7 +324,7 @@
       }
     }
 
-  // prepare chain of nodes for loop body using loop_body connection
+    // prepare chain of nodes for loop body using loop_body connection
     let bodyChainNodes = [];
     const loopBodyId = node.loop_body?.node_id || node.loopBody?.node_id || node.body_start?.node_id;
     if (loopBodyId) {
@@ -531,14 +531,14 @@
     };
 
     // Render templates in url/headers/body
-    try { url = renderTemplate(url); } catch(e){}
+    try { url = renderTemplate(url); } catch (e) { }
     try {
       const renderedHeaders = {};
       Object.keys(headers || {}).forEach(k => { renderedHeaders[k] = renderTemplate(headers[k]); });
       headers = renderedHeaders;
-    } catch(e){}
+    } catch (e) { }
     let renderedBody = body;
-    try { if (body && typeof body === 'object') renderedBody = JSON.parse(JSON.stringify(renderTemplate(body))); } catch(e){}
+    try { if (body && typeof body === 'object') renderedBody = JSON.parse(JSON.stringify(renderTemplate(body))); } catch (e) { }
 
     // Try to perform the fetch; in browser simulator, CORS may block it. We'll catch and fallback.
     let finalResponse = null;
@@ -547,16 +547,16 @@
         status: 200,
         headers: {},
         data: (mockData !== undefined) ? mockData : {
-          id: `id_${Math.floor(Math.random()*900+100)}`,
+          id: `id_${Math.floor(Math.random() * 900 + 100)}`,
           timestamp: Date.now(),
-          value: `val_${Math.floor(Math.random()*900+100)}`,
+          value: `val_${Math.floor(Math.random() * 900 + 100)}`,
           items: [{ name: 'one' }, { name: 'two' }]
         }
       };
     } else {
       try {
         const init = { method, headers };
-        if (['POST','PUT','PATCH','DELETE'].includes(method)) {
+        if (['POST', 'PUT', 'PATCH', 'DELETE'].includes(method)) {
           init.body = (headers['Content-Type'] === 'application/json' || headers['content-type'] === 'application/json') ? JSON.stringify(renderedBody ?? {}) : (renderedBody ?? '');
         }
         const res = await fetch(url, init);
@@ -573,9 +573,9 @@
             status: 200,
             headers: {},
             data: {
-              id: `id_${Math.floor(Math.random()*900+100)}`,
+              id: `id_${Math.floor(Math.random() * 900 + 100)}`,
               timestamp: Date.now(),
-              value: `val_${Math.floor(Math.random()*900+100)}`,
+              value: `val_${Math.floor(Math.random() * 900 + 100)}`,
               items: [{ name: 'one' }, { name: 'two' }]
             }
           };
@@ -604,26 +604,29 @@
     window.App = window.App || {};
     window.App.runtimeContext = window.App.runtimeContext || { variables: {} };
     // Initialize variables from start node definitions if present (parse JSON strings and coerce simple types)
-    try{
+    try {
       const startNodeId = window.App?.state?.meta?.start_node || null;
-      if (startNodeId && window.App.state && window.App.state.nodes && window.App.state.nodes[startNodeId] && Array.isArray(window.App.state.nodes[startNodeId].variables)){
+      if (startNodeId && window.App.state && window.App.state.nodes && window.App.state.nodes[startNodeId] && Array.isArray(window.App.state.nodes[startNodeId].variables)) {
         const defs = window.App.state.nodes[startNodeId].variables;
         defs.forEach(v => {
           let def = v.defaultValue;
-          if (typeof def === 'string'){
+          // If already typed (boolean, number, object), use directly
+          if (typeof def === 'boolean' || typeof def === 'number' || (typeof def === 'object' && def !== null)) {
+            // no-op, use as is
+          } else if (typeof def === 'string') {
             const s = def.trim();
-            if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))){
-              try{ def = JSON.parse(s); }catch(e){ /* keep as string on parse error */ }
+            if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
+              try { def = JSON.parse(s); } catch (e) { /* keep as string on parse error */ }
             }
             // coerce simple typed strings
             const t = def && def.toString ? def.toString().trim() : '';
-            if (/^-?\d+(?:\.\d+)?$/.test(t)) { try{ def = Number(t); }catch(_e){} }
+            if (/^-?\d+(?:\.\d+)?$/.test(t)) { try { def = Number(t); } catch (_e) { } }
             else if (/^true$/i.test(t)) def = true; else if (/^false$/i.test(t)) def = false;
           }
-          try{ window.App.runtimeContext.variables[v.name] = JSON.parse(JSON.stringify(def)); }catch(e){ window.App.runtimeContext.variables[v.name] = def; }
+          try { window.App.runtimeContext.variables[v.name] = JSON.parse(JSON.stringify(def)); } catch (e) { window.App.runtimeContext.variables[v.name] = def; }
         });
       }
-    }catch(e){ console.warn('[FlowRunner] init vars from start failed', e); }
+    } catch (e) { console.warn('[FlowRunner] init vars from start failed', e); }
     const startId = window.App?.state?.meta?.start_node || null;
     if (!startId) {
       const modal = window.FlowUI.createModalContainer();

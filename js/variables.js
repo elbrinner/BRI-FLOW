@@ -1,7 +1,7 @@
 // js/variables.js
 // Maneja recolección y renderizado de variables del flujo
-(function(){
-  function toDisplayAndTitle(raw){
+(function () {
+  function toDisplayAndTitle(raw) {
     let asString = '';
     if (raw !== null && raw !== undefined) {
       if (typeof raw === 'string') {
@@ -18,7 +18,7 @@
     return { display: asString, title: '' };
   }
 
-  function buildVariableItem(v){
+  function buildVariableItem(v) {
     const item = document.createElement('div');
     item.className = 'variable-item flex items-center justify-between';
     item.style.display = 'flex';
@@ -37,17 +37,28 @@
     val.style.color = '#d97706';
     val.className = 'font-mono';
     const raw = (v && Object.hasOwn(v, 'defaultValue')) ? v.defaultValue : '';
-    const { display, title } = toDisplayAndTitle(raw);
-    if (title) {
-      // Reemplazar por badge estilizado con tooltip elegante (similar a node-doc-badge)
-      val.textContent = '';
-      const wrap = document.createElement('span'); wrap.className = 'inline-tip-wrap';
-      const badge = document.createElement('span'); badge.className = 'info-tip'; badge.setAttribute('aria-label','Valor oculto'); badge.setAttribute('tabindex','0'); badge.textContent = 'i';
-      const tip = document.createElement('div'); tip.className = 'inline-tip'; tip.textContent = title;
-      wrap.appendChild(badge); wrap.appendChild(tip);
-      val.appendChild(wrap);
+
+    // Check for boolean type explicitly
+    if (typeof raw === 'boolean') {
+      val.textContent = raw ? '✅ True' : '❌ False';
+      val.style.color = raw ? '#059669' : '#dc2626'; // green / red
+      val.style.fontWeight = 'bold';
+    } else if (typeof raw === 'number') {
+      val.textContent = String(raw);
+      val.style.color = '#2563eb'; // blue
     } else {
-      val.textContent = display;
+      const { display, title } = toDisplayAndTitle(raw);
+      if (title) {
+        // Reemplazar por badge estilizado con tooltip elegante (similar a node-doc-badge)
+        val.textContent = '';
+        const wrap = document.createElement('span'); wrap.className = 'inline-tip-wrap';
+        const badge = document.createElement('span'); badge.className = 'info-tip'; badge.setAttribute('aria-label', 'Valor oculto'); badge.setAttribute('tabindex', '0'); badge.textContent = 'i';
+        const tip = document.createElement('div'); tip.className = 'inline-tip'; tip.textContent = title;
+        wrap.appendChild(badge); wrap.appendChild(tip);
+        val.appendChild(wrap);
+      } else {
+        val.textContent = display;
+      }
     }
     const copyBtn = document.createElement('button');
     copyBtn.type = 'button';
@@ -74,19 +85,19 @@
     const startId = state.meta.start_node;
     const list = [];
     if (startId && Array.isArray(state.nodes[startId]?.variables)) {
-  for (const v of state.nodes[startId].variables) { if (v?.name) list.push(v.name); }
+      for (const v of state.nodes[startId].variables) { if (v?.name) list.push(v.name); }
     }
     for (const id in state.nodes) {
       const n = state.nodes[id];
       if (n.save_as) list.push(n.save_as);
-  // set_var eliminado; sólo assign_var
+      // set_var eliminado; sólo assign_var
     }
     return Array.from(new Set(list));
   }
 
   function renderVariables(state, selectNode) {
     const el = document.getElementById('variablesList');
-    if(!el) return;
+    if (!el) return;
     const startId = state.meta.start_node;
     const declared = (startId && Array.isArray(state.nodes[startId]?.variables)) ? state.nodes[startId].variables : [];
     if (!declared.length) { el.textContent = '(sin variables definidas)'; return; }
@@ -96,15 +107,15 @@
     list.style.maxHeight = '240px';
     list.style.overflow = 'auto';
     list.style.paddingRight = '6px';
-  for (const v of declared) { list.appendChild(buildVariableItem(v)); }
+    for (const v of declared) { list.appendChild(buildVariableItem(v)); }
     el.appendChild(list);
     if (startId && state.nodes[startId]) {
       const btn = document.createElement('button'); btn.type = 'button'; btn.textContent = 'Editar variables en Start';
       btn.style.marginTop = '6px';
-      btn.addEventListener('click', () => { if(typeof selectNode === 'function') selectNode(startId); });
+      btn.addEventListener('click', () => { if (typeof selectNode === 'function') selectNode(startId); });
       el.appendChild(btn);
     }
   }
 
-  try { globalThis.AppVariables = { collectVariables, renderVariables }; console.debug('[AppVariables] module loaded'); } catch(error_) { console.debug('[AppVariables] asignación fallida', error_); }
+  try { globalThis.AppVariables = { collectVariables, renderVariables }; console.debug('[AppVariables] module loaded'); } catch (error_) { console.debug('[AppVariables] asignación fallida', error_); }
 })();
