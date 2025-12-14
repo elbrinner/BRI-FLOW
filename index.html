@@ -49,6 +49,19 @@
             <span>Flujos</span>
           </span>
         </button>
+
+          <button id="btnShowJson" title="Ver JSON generado" class="px-3 py-1 bg-white border rounded text-sm">
+          <span class="inline-flex items-center gap-2">
+            <!-- Code brackets icon -->
+            <svg aria-hidden="true" class="w-4 h-4 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M9 8L5 12l4 4" />
+              <path d="M15 8l4 4-4 4" />
+            </svg>
+            <span>Code</span>
+          </span>
+        </button>
+
         <button id="btnExport" class="px-3 py-1 bg-white border rounded text-sm">
           <span class="inline-flex items-center gap-2">
             <!-- Floppy disk icon -->
@@ -81,17 +94,7 @@
         </button>
         <div class="w-px h-6 bg-gray-300 mx-1"></div>
 
-        <button id="btnShowJson" title="Ver JSON generado" class="px-3 py-1 bg-white border rounded text-sm">
-          <span class="inline-flex items-center gap-2">
-            <!-- Code brackets icon -->
-            <svg aria-hidden="true" class="w-4 h-4 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M9 8L5 12l4 4" />
-              <path d="M15 8l4 4-4 4" />
-            </svg>
-            <span>Code</span>
-          </span>
-        </button>
+      
 
         <span class="zoom-controls inline-flex items-center gap-2 ml-2">
           <button id="zoomOut" title="Alejar" class="px-2 py-1 bg-white border rounded">−</button>
@@ -110,6 +113,15 @@
 
         </span>
 
+         <!-- AI Copilot Button -->
+        <button id="btnAiCopilot" title="Bri AI Assintent"
+          class="px-2 py-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white border-0 rounded shadow-sm hover:shadow-md transition-all"
+          aria-label="AI Assist">
+          <span class="inline-flex items-center gap-2">
+            <span aria-hidden="true">✨</span>
+          </span>
+        </button>
+        
         <!-- Botón de ayuda global -->
         <button id="btnHelpDoc" title="Ayuda de expresiones (len, split, etc.)"
           class="px-2 py-1 bg-white border rounded" aria-label="Ayuda">
@@ -118,14 +130,7 @@
           </span>
         </button>
 
-        <!-- AI Copilot Button -->
-        <button id="btnAiCopilot" title="Bri AI Assintent"
-          class="px-2 py-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white border-0 rounded shadow-sm hover:shadow-md transition-all"
-          aria-label="AI Assist">
-          <span class="inline-flex items-center gap-2">
-            <span aria-hidden="true">✨</span>
-          </span>
-        </button>
+       
 
         <input id="importFile" type="file" accept=".json" multiple
           class="text-sm file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 hidden" />
