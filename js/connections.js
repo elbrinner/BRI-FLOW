@@ -8,8 +8,9 @@
   let _refreshInProgress = false;
   let _queuedRefresh = false;
 
-  function init(jsPlumbObj) {
+  function init(jsPlumbObj, canvasInnerEl) {
     jsPlumbRef = jsPlumbObj;
+    console.log('[AppConnections] Initialized with jsPlumb');
   }
 
   function addEndpoints(state, nodeId) {
@@ -41,18 +42,37 @@
     if (typeof t === 'string') return t;
     if (typeof t === 'object') {
       // Si especifica flow_id y es diferente al actual, no dibujar línea
-      if (t.flow_id && currentFlowId && t.flow_id !== currentFlowId) return null;
+      // Cadena vacía o undefined se considera "mismo flujo"
+      const targetFlowId = t.flow_id || currentFlowId;
+      if (targetFlowId && currentFlowId && targetFlowId !== currentFlowId) {
+        return null;
+      }
       return t.node_id;
     }
     return null;
   }
 
   function refreshConnections(state) {
-    if (!jsPlumbRef) return;
-    if (_refreshInProgress) { _queuedRefresh = true; return; }
+    console.log('[AppConnections] refreshConnections called', {
+      hasJsPlumb: !!jsPlumbRef,
+      inProgress: _refreshInProgress,
+      nodeCount: state?.nodes ? Object.keys(state.nodes).length : 0,
+      flowId: state?.meta?.flow_id
+    });
+
+    if (!jsPlumbRef) {
+      console.warn('[AppConnections] refreshConnections: jsPlumb not initialized');
+      return;
+    }
+    if (_refreshInProgress) {
+      console.log('[AppConnections] refreshConnections: already in progress, queuing');
+      _queuedRefresh = true;
+      return;
+    }
     _refreshInProgress = true;
 
     const currentFlowId = (state.meta && state.meta.flow_id) ? state.meta.flow_id : '';
+    console.log('[AppConnections] Starting refresh for flow:', currentFlowId);
 
     try { if (jsPlumbRef.setSuspendDrawing) jsPlumbRef.setSuspendDrawing(true); } catch (_e) { }
     try { if (jsPlumbRef.deleteEveryConnection) jsPlumbRef.deleteEveryConnection(); } catch (_e) { }
@@ -150,11 +170,18 @@
       }
     }
 
+    console.log('[AppConnections] Connection specs collected:', {
+      count: toConnect.length,
+      specs: toConnect.map(s => `${s.source} -> ${s.target}${s.label ? ` (${s.label})` : ''}`)
+    });
+
     // Mantener pares creados entre intentos para saber cuándo terminamos
     const createdPairs = new Set();
+    console.log('[AppConnections] createdPairs initialized, defining doConnectPass...');
 
     function doConnectPass() {
       let createdCount = 0;
+      console.log('[AppConnections] doConnectPass: attempting to create connections');
 
       function ensureEndpointsFor(spec) {
         try {
@@ -175,12 +202,23 @@
 
       function connectWithGuards(spec) {
         if (!spec) return false;
+        const srcId = spec.source.replace(/^node_/, '');
         if (spec.source === spec.target) return false; // evitar self
         const key = spec.source + '|' + spec.target + '|' + (spec.label || '');
         if (createdPairs.has(key)) return true;
         const sEl = document.getElementById(spec.source);
         const tEl = document.getElementById(spec.target);
-        if (!sEl || !tEl) return false;
+
+        if (!sEl || !tEl) {
+          console.warn('[AppConnections] Missing element(s) for connection:', {
+            source: spec.source,
+            target: spec.target,
+            hasSource: !!sEl,
+            hasTarget: !!tEl
+          });
+          return false;
+        }
+
         ensureEndpointsFor(spec);
 
         const overlays = spec.label ? [['Label', { label: spec.label, location: 0.5 }]] : [];
@@ -188,10 +226,20 @@
         if (spec.isGotoReturn) paintStyle = { stroke: '#f97316', strokeWidth: 6 };
         else if (spec.isLoopBody) paintStyle = { stroke: '#f97316', strokeWidth: 3 };
         else if (spec.isChoiceDefault) paintStyle = { stroke: '#9333ea', strokeWidth: 3, dashstyle: '4 2' }; // morado y punteado para default
+        else {
+          const srcNode = state.nodes[srcId];
+          if (srcNode && srcNode.type === 'event_start') {
+            paintStyle = { stroke: '#d8b4fe', strokeWidth: 3, dashstyle: '4 2' };
+          }
+        }
         try {
           jsPlumbRef.connect({ source: spec.source, target: spec.target, anchors: ['Continuous', 'Continuous'], overlays: overlays, paintStyle: paintStyle });
-          createdPairs.add(key); createdCount++; return true;
-        } catch (_e) {
+          createdPairs.add(key);
+          createdCount++;
+          console.log('[AppConnections] ✓ Created connection:', spec.source, '->', spec.target);
+          return true;
+        } catch (e) {
+          console.warn('[AppConnections] ✗ Failed to create connection:', spec.source, '->', spec.target, e.message);
           try {
             jsPlumbRef.connect({ source: spec.source, target: spec.target, overlays: overlays });
             createdPairs.add(key); createdCount++; return true;
@@ -205,10 +253,18 @@
       try { const _w = (document.getElementById('canvasInner') || {}).offsetWidth; void _w; } catch (_rf) { }
       for (let i = 0; i < toConnect.length; i++) { try { connectWithGuards(toConnect[i]); } catch (_e) { } }
       for (let j = 0; j < toConnect.length; j++) { try { connectWithGuards(toConnect[j]); } catch (_e) { } }
+
+      console.log('[AppConnections] doConnectPass complete:', {
+        attempted: toConnect.length,
+        created: createdCount,
+        total: createdPairs.size
+      });
+
       return createdCount;
     }
 
     function scheduleAttempts(attempt) {
+      console.log('[AppConnections] scheduleAttempts called, attempt:', attempt);
       const count = doConnectPass();
       const allBuilt = (createdPairs.size >= toConnect.length);
       try { if (jsPlumbRef.repaintEverything) jsPlumbRef.repaintEverything(); } catch (_e) { }
@@ -230,6 +286,7 @@
       }
     }
 
+    console.log('[AppConnections] About to schedule connection attempts');
     try {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { scheduleAttempts(0); });
       else setTimeout(function () { scheduleAttempts(0); }, 0);

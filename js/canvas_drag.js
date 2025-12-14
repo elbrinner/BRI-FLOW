@@ -19,9 +19,8 @@
     const scrollLeft = canvas.scrollLeft || 0;
     const scrollTop = canvas.scrollTop || 0;
     const z = (zoomRef && typeof zoomRef === 'function') ? (zoomRef() || 1) : 1;
-    const x = ((e.clientX - rect.left) + scrollLeft - offsetX) / z;
-    const y = ((e.clientY - rect.top) + scrollTop - offsetY) / z;
-    console.log('[getCanvasCoordsFromEvent] clientX:', e.clientX, 'rect.left:', rect.left, 'scrollLeft:', scrollLeft, 'offsetX:', offsetX, 'zoom:', z, '=> x:', x, 'y:', y);
+    const x = ((e.clientX - rect.left) + scrollLeft) / z - offsetX;
+    const y = ((e.clientY - rect.top) + scrollTop) / z - offsetY;
     if (!isSnap()) return { x, y };
     return { x: snap(x), y: snap(y) };
   }
@@ -66,15 +65,27 @@
   }
 
   function handleMoveExistingNodeDrop(nodeId, e) {
-    const offX = parseInt(e.dataTransfer.getData('dragOffsetX') || '0');
-    const offY = parseInt(e.dataTransfer.getData('dragOffsetY') || '0');
+    console.log('[canvas_drag] handleMoveExistingNodeDrop called for:', nodeId);
+
+    const offX = parseFloat(e.dataTransfer.getData('dragOffsetX') || '0');
+    const offY = parseFloat(e.dataTransfer.getData('dragOffsetY') || '0');
+    console.log('[canvas_drag] Drag offsets:', { offX, offY });
 
     // Use helper to respect scroll and snap
     const { x, y } = getCanvasCoordsFromEvent(e, offX, offY);
+    console.log('[canvas_drag] Calculated new coords:', { x, y });
 
     const n = stateRef.nodes[nodeId];
     if (n) {
+      console.log('[canvas_drag] Current node position:', { oldX: n.x, oldY: n.y });
+
+      // Capture old state for history
+      const oldPos = { x: n.x, y: n.y };
+      const newPos = { x, y };
+      const sideEffects = { before: {}, after: {} };
+
       n.x = x; n.y = y;
+      console.log('[canvas_drag] Set new node position:', { newX: n.x, newY: n.y });
 
       // Auto-insert logic for existing nodes
       let conn = highlightedConn;
@@ -92,6 +103,9 @@
           // 1. Update source -> moved node
           const sourceNode = stateRef.nodes[sourceId];
           if (sourceNode) {
+            // CAPTURE BEFORE STATE
+            try { sideEffects.before[sourceId] = JSON.parse(JSON.stringify(sourceNode)); } catch (e) { }
+
             let replaced = false;
             const replaceRef = (obj) => {
               if (obj && obj.node_id === targetId) {
@@ -110,7 +124,13 @@
 
             if (replaced) {
               console.log('[canvas_drag] Source node updated.');
+
+              // 3. Delete old connection (Do this BEFORE rendering to avoid stale element references)
+              try { jsPlumb.deleteConnection(conn); } catch (err) { }
+
               renderNode(sourceNode);
+              // CAPTURE AFTER STATE
+              try { sideEffects.after[sourceId] = JSON.parse(JSON.stringify(sourceNode)); } catch (e) { }
             }
           }
 
@@ -123,9 +143,6 @@
             }
           }
 
-          // 3. Delete old connection
-          try { jsPlumb.deleteConnection(conn); } catch (err) { }
-
           // Cleanup highlight
           if (highlightedConn) {
             try { highlightedConn.setPaintStyle(originalPaintStyle || { stroke: '#456', strokeWidth: 2 }); } catch (err) { }
@@ -135,10 +152,55 @@
         }
       }
 
+      // Bulk Move Logic (applies to both connection drop and regular drop)
+      const deltaX = newPos.x - oldPos.x;
+      const deltaY = newPos.y - oldPos.y;
+
+      const commands = [];
+
+      // 1. Command for the primary node (with side effects from connection logic if any)
+      commands.push(
+        window.AppHistoryManager.createMoveNodeCommand(nodeId, oldPos, newPos, sideEffects)
+      );
+
+      // 2. Check for other selected nodes (multi-selection)
+      if (window.AppSelectionManager && window.AppSelectionManager.isSelected(nodeId)) {
+        const selectedIds = window.AppSelectionManager.getSelection();
+        selectedIds.forEach(otherId => {
+          if (otherId === nodeId) return; // Skip primary
+          const otherNode = stateRef.nodes[otherId];
+          if (otherNode) {
+            const otherOldPos = { x: otherNode.x, y: otherNode.y };
+            const otherNewPos = { x: otherNode.x + deltaX, y: otherNode.y + deltaY };
+
+            otherNode.x = otherNewPos.x;
+            otherNode.y = otherNewPos.y;
+
+            renderNode(otherNode);
+
+            // Add simple move command (no side effects for secondary nodes for now)
+            if (window.AppHistoryManager) {
+              commands.push(
+                window.AppHistoryManager.createMoveNodeCommand(otherId, otherOldPos, otherNewPos, { before: {}, after: {} })
+              );
+            }
+          }
+        });
+      }
+
+      // ALWAYS render the primary node after position update
       renderNode(n);
+      console.log('[canvas_drag] After renderNode, node position should be:', { x: n.x, y: n.y });
       selectNode(nodeId);
       refreshOutput();
       if (autoGrow) autoGrow();
+
+      // Record History - record each command individually
+      if (window.AppHistoryManager && commands.length > 0) {
+        commands.forEach(cmd => {
+          window.AppHistoryManager.recordCommand(cmd);
+        });
+      }
     }
   }
 
@@ -170,13 +232,10 @@
     console.log('[canvas_drag] Drop event. Type:', type, 'Canvas coords:', x, y);
 
     let newNode = null;
+    const sideEffects = { before: {}, after: {} };
 
     // Try to use the highlighted connection from dragover first
-    let conn = highlightedConn;
-    if (!conn) {
-      console.log('[canvas_drag] No highlightedConn, trying findConnectionAtPoint...');
-      conn = findConnectionAtPoint(e.clientX, e.clientY);
-    }
+    let conn = connection; // Use the one we found or highlighted
 
     if (conn) {
       console.log('[canvas_drag] Connection detected for drop:', conn);
@@ -186,13 +245,19 @@
       const targetId = conn.targetId.replace('node_', '');
       console.log('[canvas_drag] Splitting connection between:', sourceId, 'and', targetId);
 
-      // 2. Create new node at drop location (coords ya centradas y con snap si corresponde)
+      // Create new node first so we have its ID
       newNode = createNode(type, x, y);
       console.log('[canvas_drag] New node created:', newNode.id);
 
-      // 3. Update source node to point to new node
+      // 2. Update source node to point to new node
       const sourceNode = stateRef.nodes[sourceId];
       if (sourceNode) {
+        // CAPTURE BEFORE STATE
+        try {
+          sideEffects.before[sourceId] = JSON.parse(JSON.stringify(sourceNode));
+          console.log(`[canvas_drag] Captured before state for ${sourceId}:`, sideEffects.before[sourceId]);
+        } catch (e) { console.warn('Error capturing before state', e); }
+
         // Helper to replace reference
         let replaced = false;
         const replaceRef = (obj) => {
@@ -224,50 +289,56 @@
         if (sourceNode.default_target) replaceRef(sourceNode.default_target);
 
         if (replaced) {
-          console.log('[canvas_drag] Source node updated.');
-          renderNode(sourceNode);
+          // 3. Delete old connection (Do this BEFORE rendering nodes/updating DOM to avoid stale element references)
+          try {
+            if (conn) jsPlumb.deleteConnection(conn);
+          } catch (err) { console.warn('Error deleting old connection', err); }
+
+          // 4. Update new node to point to old target
+          if (newNode.type !== 'end') {
+            if (!newNode.next && !newNode.options && !newNode.true_target) {
+              newNode.next = { flow_id: stateRef.meta.flow_id, node_id: targetId };
+              console.log('[canvas_drag] New node next set to:', targetId);
+            } else {
+              console.log('[canvas_drag] New node is complex, not auto-connecting output.');
+            }
+          }
+
+          renderNode(newNode);
+
+          if (sourceNode) {
+            renderNode(sourceNode);
+          }
         } else {
-          console.warn('[canvas_drag] Could not find reference to target in source node. Manual connection might be needed.');
+          // Fallback if replacement failed logic
+          // But node is already created?
+          console.log('[canvas_drag] Source node found but no reference to target replaced.');
         }
+
       }
-
-      // 4. Update new node to point to old target
-      if (newNode.type !== 'end') {
-        if (!newNode.next && !newNode.options && !newNode.true_target) {
-          newNode.next = { flow_id: stateRef.meta.flow_id, node_id: targetId };
-          console.log('[canvas_drag] New node next set to:', targetId);
-        } else {
-          console.log('[canvas_drag] New node is complex, not auto-connecting output.');
-        }
-      }
-
-      renderNode(newNode);
-
-      // 5. Remove old connection (jsPlumb) and refresh
-      try {
-        jsPlumb.deleteConnection(conn);
-      } catch (err) { console.warn('Error deleting old connection', err); }
-
-      refreshOutput();
-      selectNode(newNode.id);
-
-      // Restore style just in case
-      if (highlightedConn) {
-        try { highlightedConn.setPaintStyle(originalPaintStyle || { stroke: '#456', strokeWidth: 2 }); } catch (err) { }
-        highlightedConn = null;
-        originalPaintStyle = null;
-      }
-
     } else {
       console.log('[canvas_drag] No connection found, creating standalone node.');
       // Normal create (coords ya calculadas con scroll/zoom/snap)
       newNode = createNode(type, x, y);
+    }
+
+    // Finalize
+    if (newNode) {
       selectNode(newNode.id);
       refreshOutput();
+
+      // Record History (Add)
+      if (window.AppHistoryManager) {
+        window.AppHistoryManager.recordCommand(
+          window.AppHistoryManager.createAddNodeCommand(newNode.id, newNode, sideEffects)
+        );
+      }
+
+      if (window.App && typeof window.App.ensureNodeVisible === 'function') window.App.ensureNodeVisible(newNode, 120);
     }
+
     canvas.style.cursor = '';
     if (autoGrow) autoGrow();
-    if (newNode && window.App && typeof window.App.ensureNodeVisible === 'function') window.App.ensureNodeVisible(newNode, 120);
   }
 
   function init(opts) {
@@ -280,77 +351,77 @@
       if (!targetEl) return;
       // DRAG OVER: Visual feedback
       targetEl.addEventListener('dragover', (e) => {
-      e.preventDefault();
+        e.preventDefault();
 
-      // Throttle visual check slightly if needed, but usually OK
-      const conn = findConnectionAtPoint(e.clientX, e.clientY);
+        // Throttle visual check slightly if needed, but usually OK
+        const conn = findConnectionAtPoint(e.clientX, e.clientY);
 
-      if (conn) {
-        if (highlightedConn !== conn) {
-          // Unhighlight previous
+        if (conn) {
+          if (highlightedConn !== conn) {
+            // Unhighlight previous
+            if (highlightedConn) {
+              try { highlightedConn.setPaintStyle(originalPaintStyle || { stroke: '#456', strokeWidth: 2 }); } catch (err) { }
+            }
+
+            // Highlight new
+            highlightedConn = conn;
+            try {
+              originalPaintStyle = conn.getPaintStyle();
+              conn.setPaintStyle({ stroke: '#22c55e', strokeWidth: 4, outlineStroke: 'transparent', outlineWidth: 5 }); // Green-500
+              canvas.style.cursor = 'copy';
+            } catch (err) {
+              console.warn('Error highlighting connection', err);
+            }
+          }
+        } else {
+          // No connection under mouse
           if (highlightedConn) {
             try { highlightedConn.setPaintStyle(originalPaintStyle || { stroke: '#456', strokeWidth: 2 }); } catch (err) { }
-          }
-
-          // Highlight new
-          highlightedConn = conn;
-          try {
-            originalPaintStyle = conn.getPaintStyle();
-            conn.setPaintStyle({ stroke: '#22c55e', strokeWidth: 4, outlineStroke: 'transparent', outlineWidth: 5 }); // Green-500
-            canvas.style.cursor = 'copy';
-          } catch (err) {
-            console.warn('Error highlighting connection', err);
+            highlightedConn = null;
+            originalPaintStyle = null;
+            canvas.style.cursor = '';
           }
         }
-      } else {
-        // No connection under mouse
-        if (highlightedConn) {
-          try { highlightedConn.setPaintStyle(originalPaintStyle || { stroke: '#456', strokeWidth: 2 }); } catch (err) { }
-          highlightedConn = null;
-          originalPaintStyle = null;
-          canvas.style.cursor = '';
-        }
-      }
       });
 
       // DRAG LEAVE: Cleanup
       targetEl.addEventListener('dragleave', (e) => {
-      // Only if leaving the canvas container
-      if (e.target === targetEl) {
-        if (highlightedConn) {
-          try { highlightedConn.setPaintStyle(originalPaintStyle || { stroke: '#456', strokeWidth: 2 }); } catch (err) { }
-          highlightedConn = null;
-          originalPaintStyle = null;
+        // Only if leaving the canvas container
+        if (e.target === targetEl) {
+          if (highlightedConn) {
+            try { highlightedConn.setPaintStyle(originalPaintStyle || { stroke: '#456', strokeWidth: 2 }); } catch (err) { }
+            highlightedConn = null;
+            originalPaintStyle = null;
+          }
         }
-      }
       });
 
       targetEl.addEventListener('drop', (e) => {
-      e.preventDefault();
-      console.log('[canvas_drag] Drop event triggered.');
+        e.preventDefault();
+        console.log('[canvas_drag] Drop event triggered.');
 
-      // Restore cursor
-      canvas.style.cursor = '';
+        // Restore cursor
+        canvas.style.cursor = '';
 
-      const dt = e.dataTransfer.getData('text/plain');
-      if (dt && stateRef.nodes[dt]) {
-        console.log('[canvas_drag] Handling existing node drop:', dt);
-        return handleMoveExistingNodeDrop(dt, e);
-      }
+        const dt = e.dataTransfer.getData('text/plain');
+        if (dt && stateRef.nodes[dt]) {
+          console.log('[canvas_drag] Handling existing node drop:', dt);
+          return handleMoveExistingNodeDrop(dt, e);
+        }
 
-      const t = e.dataTransfer.getData('node-type');
-      if (t) {
-        console.log('[canvas_drag] Handling new node drop (from node-type):', t);
-        return handleCreateNodeDrop(t, e);
-      }
+        const t = e.dataTransfer.getData('node-type');
+        if (t) {
+          console.log('[canvas_drag] Handling new node drop (from node-type):', t);
+          return handleCreateNodeDrop(t, e);
+        }
 
-      const type = e.dataTransfer.getData('type') || e.dataTransfer.getData('node-type') || e.dataTransfer.getData('text/plain');
-      if (type && typeof type === 'string' && !stateRef.nodes[type] && ALLOWED_TYPES.includes(type)) {
-        console.log('[canvas_drag] Handling new node drop (from generic type/text/plain):', type);
-        return handleCreateNodeDrop(type, e);
-      }
-      console.log('[canvas_drag] Drop event did not result in node creation or move.');
-    });
+        const type = e.dataTransfer.getData('type') || e.dataTransfer.getData('node-type') || e.dataTransfer.getData('text/plain');
+        if (type && typeof type === 'string' && !stateRef.nodes[type] && ALLOWED_TYPES.includes(type)) {
+          console.log('[canvas_drag] Handling new node drop (from generic type/text/plain):', type);
+          return handleCreateNodeDrop(type, e);
+        }
+        console.log('[canvas_drag] Drop event did not result in node creation or move.');
+      });
 
     };
 
@@ -380,9 +451,22 @@
     });
 
     canvas.addEventListener('click', (e) => {
-      stateRef.selectedId = null; if (typeof opts.showProperties === 'function') opts.showProperties(null);
-      document.querySelectorAll('.node').forEach(nd => nd.style.outline = '');
-      const propsPanel = document.getElementById('properties'); if (propsPanel) propsPanel.classList.remove('force-visible');
+      // Check if this click was part of a Lasso selection
+      if (window.AppCanvasSelection && window.AppCanvasSelection.wasLasso) {
+        window.AppCanvasSelection.wasLasso = false;
+        return;
+      }
+
+      // Use SelectionManager if available
+      if (window.AppSelectionManager) {
+        window.AppSelectionManager.clear();
+      } else {
+        // Fallback
+        stateRef.selectedId = null;
+        if (typeof opts.showProperties === 'function') opts.showProperties(null);
+        document.querySelectorAll('.node').forEach(nd => nd.style.outline = '');
+        const propsPanel = document.getElementById('properties'); if (propsPanel) propsPanel.classList.remove('force-visible');
+      }
     });
   }
 

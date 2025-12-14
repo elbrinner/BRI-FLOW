@@ -4,9 +4,11 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "test:form": "node tests/form_processForm_node_test.mjs"
+    "test:form": "node tests/form_processForm_node_test.mjs",
+    "test:e2e": "playwright test"
   },
   "devDependencies": {
+    "@playwright/test": "^1.57.0",
     "jsdom": "^22.1.0"
   }
 }

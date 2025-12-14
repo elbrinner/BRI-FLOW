@@ -202,7 +202,7 @@
         persist();
         renderList();
       }
-    } catch(_e) {
+    } catch (_e) {
       // Fallback: si no hay principal, establecer éste; si ya hay, dejar como no principal
       if (!proj.main_flow_id) setMainFlow(fid); else { persist(); renderList(); }
     }
@@ -242,14 +242,14 @@
         if (activeId === fid) st.meta.is_main = true;
         else if (activeId === prevMain) st.meta.is_main = false;
         // refrescar salida y variables si está disponible
-        try { if (window.App?.refreshOutput) window.App.refreshOutput(); } catch (_e) {}
+        try { if (window.App?.refreshOutput) window.App.refreshOutput(); } catch (_e) { }
         // Actualizar chip en badge de cabecera
         try {
           const chip = document.getElementById('mainFlowChip');
           if (chip) chip.classList.toggle('hidden', !(st.meta && st.meta.is_main === true));
         } catch (_c) { /* noop */ }
       }
-    } catch(_e) { /* noop */ }
+    } catch (_e) { /* noop */ }
     persist(); renderList();
   }
 
@@ -312,8 +312,13 @@
         try {
           const name = prompt('Nombre del flujo principal:', 'principal') || 'principal';
           const fid = (name || 'principal').toLowerCase().replace(/[^a-z0-9_-]+/g, '_');
-          // Crear flujo vacío (sin Start automático)
-          proj.flows[fid] = { meta: { flow_id: fid, name, locales: ['es'], start_node: '', is_main: true }, nodes: {} };
+          // Crear flujo con nodo Start por defecto
+          proj.flows[fid] = {
+            meta: { flow_id: fid, name, locales: ['es'], start_node: 'start', is_main: true },
+            nodes: {
+              'start': { id: 'start', type: 'start', x: 100, y: 100, variables: [], next: null }
+            }
+          };
           proj.main_flow_id = fid; proj.active_flow_id = fid;
           // Crear flujo fallback por defecto si no existe
           const fbId = 'fallback';

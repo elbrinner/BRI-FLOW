@@ -21,7 +21,8 @@
             title="Flujo activo">
             <span aria-hidden="true">🧭</span>
             <span id="currentFlowName">(sin flujo)</span>
-            <span id="mainFlowChip" class="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700 border border-green-200 hidden">Principal</span>
+            <span id="mainFlowChip"
+              class="ml-1 px-2 py-0.5 rounded-full text-[10px] bg-green-100 text-green-700 border border-green-200 hidden">Principal</span>
           </span>
         </div>
       </div>
@@ -57,7 +58,7 @@
               <rect x="7" y="14" width="10" height="5" fill="white" opacity="0.9"></rect>
               <rect x="9" y="15" width="6" height="2.5" rx="0.5" class="fill-gray-300"></rect>
             </svg>
-            <span>Guardar</span>
+            
           </span>
         </button>
         <button id="btnOpenSimulatorModal" title="Abrir simulador en modal"
@@ -67,9 +68,19 @@
             <svg aria-hidden="true" class="w-4 h-4 text-green-600" viewBox="0 0 24 24" fill="currentColor">
               <path d="M8 5v14l11-7-11-7z"></path>
             </svg>
-            <span>Simulador</span>
           </span>
         </button>
+        <!-- Undo/Redo Controls -->
+        <button id="btnUndo" title="Deshacer (Ctrl+Z)"
+          class="px-2 py-1 bg-white border rounded text-sm hover:bg-gray-50" aria-label="Deshacer">
+          <span aria-hidden="true">↩️</span>
+        </button>
+        <button id="btnRedo" title="Rehacer (Ctrl+Shift+Z)"
+          class="px-2 py-1 bg-white border rounded text-sm hover:bg-gray-50" aria-label="Rehacer">
+          <span aria-hidden="true">↪️</span>
+        </button>
+        <div class="w-px h-6 bg-gray-300 mx-1"></div>
+
         <button id="btnShowJson" title="Ver JSON generado" class="px-3 py-1 bg-white border rounded text-sm">
           <span class="inline-flex items-center gap-2">
             <!-- Code brackets icon -->
@@ -78,7 +89,7 @@
               <path d="M9 8L5 12l4 4" />
               <path d="M15 8l4 4-4 4" />
             </svg>
-            <span>Ver JSON</span>
+            <span>Code</span>
           </span>
         </button>
 
@@ -104,7 +115,15 @@
           class="px-2 py-1 bg-white border rounded" aria-label="Ayuda">
           <span class="inline-flex items-center gap-2">
             <span aria-hidden="true">ℹ️</span>
-            <span class="text-sm">Ayuda</span>
+          </span>
+        </button>
+
+        <!-- AI Copilot Button -->
+        <button id="btnAiCopilot" title="Bri AI Assintent"
+          class="px-2 py-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white border-0 rounded shadow-sm hover:shadow-md transition-all"
+          aria-label="AI Assist">
+          <span class="inline-flex items-center gap-2">
+            <span aria-hidden="true">✨</span>
           </span>
         </button>
 
@@ -123,47 +142,96 @@
     <aside id="palette" aria-label="Paleta de nodos">
       <h2>Nodos</h2>
 
-      <div class="draggable start-special" draggable="true" data-type="start"
-        title="Nodo de inicio del flujo (solo 1 por flujo)">🚀 Start</div>
-      <div class="draggable" draggable="true" data-type="response">📣 Response</div>
-      <div class="draggable" draggable="true" data-type="input">⌨️ Input</div>
-      <div class="draggable" draggable="true" data-type="assign_var">🔧 Assign Variable</div>
-      <div class="draggable" draggable="true" data-type="button">🔘 Button</div>
-      <div class="draggable" draggable="true" data-type="multi_button" title="Permite seleccionar varias opciones">✅
-        Multi Select Button</div>
-      <div class="draggable" draggable="true" data-type="rest_call">🔗 API REST Call</div>
+      <div class="space-y-2">
+        <!-- Control & Debug -->
+        <details class="group" open>
+          <summary class="font-semibold cursor-pointer p-2 bg-gray-100 hover:bg-gray-200 rounded select-none text-sm">
+            Control & Debug</summary>
+          <div class="pl-2 pt-2 space-y-1">
+            <div class="draggable start-special" draggable="true" data-type="start"
+              title="Nodo de inicio del flujo (solo 1 por flujo)">🚀 Start</div>
+            <div class="draggable" draggable="true" data-type="end" title="Nodo fin del flujo">🏁 End</div>
+            <div class="draggable" draggable="true" data-type="debug" title="Nodo debug: muestra mensaje y datos">🐛
+              Debug</div>
+            <div class="draggable" draggable="true" data-type="set_goto">🔙 Set Goto</div>
+            <div class="draggable" draggable="true" data-type="flow_jump"
+              title="Llama a otro flujo y puede volver al origen">⤴️ Flow Jump</div>
+          </div>
+        </details>
 
-      <div class="draggable" draggable="true" data-type="foreach" title="Itera sobre una lista (simple)">🔁 ForEach
+        <!-- Agents & AI -->
+        <details class="group" open>
+          <summary class="font-semibold cursor-pointer p-2 bg-gray-100 hover:bg-gray-200 rounded select-none text-sm">
+            Agents & AI</summary>
+          <div class="pl-2 pt-2 space-y-1">
+            <div class="draggable" draggable="true" data-type="agent_call" title="Llamada a agente (RAG o normal)">🤖
+              Agent Call</div>
+            <div class="draggable" draggable="true" data-type="voice_agent" title="Agente de voz en tiempo real">🎙️
+              Voice Agent</div>
+            <div class="draggable" draggable="true" data-type="use_profile" title="Usar perfil de simulador">🔐 Use
+              Profile</div>
+            <div class="draggable" draggable="true" data-type="credential_profile" title="Perfil de credenciales">🔑
+              Credential Profile</div>
+          </div>
+        </details>
+
+        <!-- Logic & Flow -->
+        <details class="group" open>
+          <summary class="font-semibold cursor-pointer p-2 bg-gray-100 hover:bg-gray-200 rounded select-none text-sm">
+            Logic & Flow</summary>
+          <div class="pl-2 pt-2 space-y-1">
+            <div class="draggable" draggable="true" data-type="condition">❓ Condition (If)</div>
+            <div class="draggable" draggable="true" data-type="choice_switch"
+              title="Choice (switch): evalúa casos y salta automáticamente">🔀 Choice (switch)</div>
+            <div class="draggable" draggable="true" data-type="loop" title="Loop genérico">🔄 Loop</div>
+            <div class="draggable" draggable="true" data-type="foreach" title="Itera sobre una lista (simple)">🔁
+              ForEach</div>
+            <div class="draggable" draggable="true" data-type="while" title="Itera mientras la condición sea verdadera">
+              ⏳ While</div>
+            <div class="draggable" draggable="true" data-type="assign_var">🔧 Assign Variable</div>
+            <div class="draggable" draggable="true" data-type="event_start" title="Inicio por evento (webhook, timer)">⚡
+              Event Start</div>
+            <div class="draggable" draggable="true" data-type="human_validation" title="Requiere aprobación humana">🛡️
+              Human Validation</div>
+            <div class="draggable" draggable="true" data-type="extra"
+              title="Nodo Extra: espera valor externo del frontend">🧩 Extra</div>
+          </div>
+        </details>
+
+        <!-- UI Components -->
+        <details class="group" open>
+          <summary class="font-semibold cursor-pointer p-2 bg-gray-100 hover:bg-gray-200 rounded select-none text-sm">UI
+            Components</summary>
+          <div class="pl-2 pt-2 space-y-1">
+            <div class="draggable" draggable="true" data-type="response">📣 Response</div>
+            <div class="draggable" draggable="true" data-type="hidden_response"
+              title="Respuesta oculta (no visible al usuario)">👻 Hidden Response</div>
+            <div class="draggable" draggable="true" data-type="input">⌨️ Input</div>
+            <div class="draggable" draggable="true" data-type="button">🔘 Button</div>
+            <div class="draggable" draggable="true" data-type="multi_button"
+              title="Permite seleccionar varias opciones">✅ Multi Select</div>
+            <div class="draggable" draggable="true" data-type="form">📝 Form</div>
+            <div class="draggable" draggable="true" data-type="hero_card" title="Tarjeta visual con botones">🃏 Hero
+              Card</div>
+            <div class="draggable" draggable="true" data-type="carousel" title="Carrusel de tarjetas">🎠 Carousel</div>
+          </div>
+        </details>
+
+        <!-- Tools & Data -->
+        <details class="group" open>
+          <summary class="font-semibold cursor-pointer p-2 bg-gray-100 hover:bg-gray-200 rounded select-none text-sm">
+            Tools & Data</summary>
+          <div class="pl-2 pt-2 space-y-1">
+            <div class="draggable" draggable="true" data-type="rest_call">🔗 API REST Call</div>
+            <div class="draggable" draggable="true" data-type="file_upload" title="Subir archivo">📎 File Upload</div>
+            <div class="draggable" draggable="true" data-type="json_upload"
+              title="Subir JSON (envía datos parseados vía extra)">📋 JSON Upload</div>
+            <div class="draggable" draggable="true" data-type="json_export" title="Descargar JSON">📥 JSON Export</div>
+            <div class="draggable" draggable="true" data-type="file_download" title="Descargar archivo">💾 File Download
+            </div>
+          </div>
+        </details>
       </div>
-      <div class="draggable" draggable="true" data-type="while" title="Itera mientras la condición sea verdadera">⏳
-        While</div>
-      <div class="draggable" draggable="true" data-type="extra" title="Nodo Extra: espera valor externo del frontend">🧩
-        Extra</div>
-
-
-      <div class="draggable" draggable="true" data-type="form">📝 Form</div>
-      <div class="draggable" draggable="true" data-type="choice_switch"
-        title="Choice (switch): evalúa casos y salta automáticamente">🔀 Choice (switch)</div>
-      <div class="draggable" draggable="true" data-type="flow_jump" title="Llama a otro flujo y puede volver al origen">
-        ⤴️ Flow Jump</div>
-
-      <div class="draggable" draggable="true" data-type="condition">❓ Condition (If)</div>
-      <div class="draggable" draggable="true" data-type="agent_call" title="Llamada a agente (RAG o normal)">🤖 Agent
-        Call</div>
-      <div class="draggable" draggable="true" data-type="set_goto">🔙 Set Goto</div>
-      <div class="draggable" draggable="true" data-type="end" title="Nodo fin del flujo">🏁 End</div>
-      <div class="draggable" draggable="true" data-type="debug" title="Nodo debug: muestra mensaje y datos">🐛 Debug
-      </div>
-      <div class="draggable" draggable="true" data-type="file_upload" title="Subir archivo">📎 File Upload</div>
-      <div class="draggable" draggable="true" data-type="json_upload"
-        title="Subir JSON (envía datos parseados vía extra)">📋 JSON Upload</div>
-      <div class="draggable" draggable="true" data-type="json_export" title="Descargar JSON">📥 JSON Export</div>
-      <div class="draggable" draggable="true" data-type="file_download" title="Descargar archivo">💾 File Download</div>
-      <div class="draggable" draggable="true" data-type="hero_card" title="Tarjeta visual con botones">🃏 Hero Card
-      </div>
-      <div class="draggable" draggable="true" data-type="carousel" title="Carrusel de tarjetas">🎠 Carousel</div>
-      <div class="draggable" draggable="true" data-type="hidden_response"
-        title="Respuesta oculta (no visible al usuario)">👻 Hidden Response</div>
 
 
     </aside>
@@ -285,11 +353,23 @@
   <script src="js/compact_mode.js"></script>
   <script src="js/app_helpers.js"></script>
   <script src="js/ui_state.js"></script>
+  <script src="js/selection_manager.js"></script>
+  <script src="js/canvas_selection.js"></script>
   <script src="js/canvas_drag.js"></script>
+  <script src="js/history_manager.js"></script>
+  <script src="js/node_search.js"></script>
   <script src="js/keyboard_controls.js"></script>
   <script src="js/serializer.js"></script>
   <script src="js/io.js"></script>
   <script src="js/node_factory.js"></script>
+  <script src="js/canvas_manager.js"></script>
+  <script src="js/flow_importer.js"></script>
+  <script src="js/flow_manager.js"></script>
+  <!-- AI Copilot Scripts (must load before main.js) -->
+  <script src="js/copilot_local.js"></script>
+  <script src="js/copilot_azure.js"></script>
+  <script src="js/copilot_core.js"></script>
+  <script src="js/copilot_ui.js"></script>
   <script src="js/main.js"></script>
   <script src="js/project_flows.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.umd.js"></script>
@@ -328,6 +408,67 @@
     });
   </script>
   <script>
+    // Wire simulator and AI assist modal buttons
+    document.addEventListener('DOMContentLoaded', () => {
+      // Simulator modal
+      const btnOpenSim = document.getElementById('btnOpenSimulatorModal');
+      const simModal = document.getElementById('simulatorModal');
+      const btnCloseSim = document.getElementById('simulatorModalClose');
+
+      if (btnOpenSim && simModal) {
+        btnOpenSim.addEventListener('click', () => {
+          simModal.classList.remove('hidden');
+          simModal.classList.add('flex');
+          console.log('[UI] Simulator modal opened');
+
+          // Auto-load and start the flow
+          setTimeout(() => {
+            try {
+              if (!window.Simulador) {
+                console.warn('[UI] Simulador not initialized');
+                return;
+              }
+
+              // Load flow from editor
+              if (window.Simulador.flow && typeof window.Simulador.flow.loadFlowFromEditor === 'function') {
+                const flow = window.Simulador.flow.loadFlowFromEditor();
+                console.log('[UI] Flow loaded:', flow?.name || flow?.flow_id);
+
+                // Initialize state
+                if (window.Simulador.state && typeof window.Simulador.state.init === 'function') {
+                  window.Simulador.state.init(flow);
+                  console.log('[UI] State initialized');
+                }
+
+                // Start engine
+                if (window.Simulador.engine && typeof window.Simulador.engine.start === 'function') {
+                  window.Simulador.engine.start();
+                  console.log('[UI] Engine started');
+                } else {
+                  console.warn('[UI] Engine not available');
+                }
+              } else {
+                console.warn('[UI] Flow loader not available');
+              }
+            } catch (e) {
+              console.error('[UI] Failed to start simulator:', e);
+              if (window.Simulador?.ui?.log) {
+                window.Simulador.ui.log('Error al iniciar: ' + e.message);
+              }
+            }
+          }, 100);
+        });
+      }
+      if (btnCloseSim && simModal) {
+        btnCloseSim.addEventListener('click', () => {
+          simModal.classList.add('hidden');
+          simModal.classList.remove('flex');
+          console.log('[UI] Simulator modal closed');
+        });
+      }
+    });
+  </script>
+  <script>
     // Auto-loader para pruebas rápidas: ?autotest=1 carga tests/form_test.json y abre el simulador
     document.addEventListener('DOMContentLoaded', async () => {
       try {
@@ -357,23 +498,6 @@
         console.warn('[AutoTest] error', e);
       }
     });
-  </script>
-  <script>
-    // Bootstrap temporal SOLO para esta prueba: si estamos en localhost y no hay ?autotest,
-    // redirige una vez a ?autotest=1. Se controla con localStorage 'bri_autotest_once'.
-    (function () {
-      try {
-        const isLocal = location.hostname === 'localhost' || location.hostname === '127.0.0.1';
-        const hasAuto = new URLSearchParams(location.search).has('autotest');
-        const already = localStorage.getItem('bri_autotest_once') === 'done';
-        if (isLocal && !hasAuto && !already) {
-          localStorage.setItem('bri_autotest_once', 'done');
-          const url = new URL(location.href);
-          url.searchParams.set('autotest', '1');
-          location.replace(url.toString());
-        }
-      } catch (e) { /* noop */ }
-    })();
   </script>
 
   <!-- Modal Flujos -->
@@ -493,6 +617,10 @@
             class="border-r bg-gray-50 p-4 flex flex-col gap-4 overflow-auto text-xs">
             <div id="simulatorWarnings" class="hidden p-2 rounded border border-amber-300 bg-amber-50 text-amber-800">
             </div>
+
+            <!-- Controls Container (Event Trigger, etc.) -->
+            <div id="simulatorControls" class="mb-2"></div>
+
             <div>
               <h4 class="font-semibold mb-1 text-sm">Flow JSON</h4>
               <pre id="debugFlowJson"
@@ -547,9 +675,144 @@
       </div>
     </div>
   </div>
-</body>
+  <div id="copilotModal"
+    class="fixed inset-0 z-[400] hidden items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm"
+    aria-hidden="true" role="dialog" aria-modal="true">
+    <div
+      class="w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden transform transition-all scale-100 flex flex-col h-[600px]">
+      <div class="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex items-center justify-between shrink-0">
+        <h3 class="text-lg font-bold text-white flex items-center gap-2">
+          <span>✨</span> AI Copilot
+        </h3>
+        <button id="copilotModalClose" class="text-white/80 hover:text-white transition-colors">✕</button>
+      </div>
 
-<!-- JSON modal -->
+      <!-- Tabs -->
+      <div class="flex border-b shrink-0">
+        <button id="tabGen"
+          class="flex-1 py-3 text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors">
+          Flow Generator
+        </button>
+        <button id="tabChat"
+          class="flex-1 py-3 text-sm font-semibold text-gray-500 hover:text-indigo-600 hover:bg-gray-50 transition-colors">
+          Ask Expert
+        </button>
+      </div>
+
+      <!-- Content Area -->
+      <div class="flex-1 overflow-hidden relative">
+
+        <!-- Generator Tab -->
+        <div id="panelGen" class="absolute inset-0 flex flex-col p-6 space-y-4 overflow-y-auto">
+          <div>
+            <label for="copilotPrompt" class="block text-sm font-medium text-gray-700 mb-2">
+              Describe el flujo que deseas crear:
+            </label>
+            <textarea id="copilotPrompt"
+              class="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm"
+              placeholder="Ej: Crea un flujo para agendar una cita médica. Primero pide el nombre, luego la especialidad, y finalmente confirma la fecha."></textarea>
+            <p class="text-xs text-gray-500 mt-2 text-right">
+              Powered by <span class="font-semibold text-purple-600">Bri Copilot V1</span>
+            </p>
+          </div>
+
+          <div id="copilotError" class="hidden p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-100">
+          </div>
+
+          <div class="mt-auto pt-4 border-t flex justify-end gap-3">
+            <button id="copilotBtnCancel"
+              class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium text-sm transition-colors">Cancelar</button>
+            <button id="copilotBtnGenerate"
+              class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 font-medium text-sm shadow-md transition-all flex items-center gap-2">
+              <span>Generar Flujo</span>
+              <svg id="copilotSpinner" class="animate-spin h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg"
+                fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+                </path>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <!-- Chat Tab -->
+        <div id="panelChat" class="absolute inset-0 flex flex-col hidden bg-gray-50">
+          <div id="copilotChatHistory" class="flex-1 overflow-y-auto p-4 space-y-3">
+            <div class="flex gap-2 items-start">
+              <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">🤖</div>
+              <div
+                class="bg-white p-3 rounded-tr-xl rounded-br-xl rounded-bl-xl shadow-sm text-sm text-gray-700 border">
+                Hola, soy tu experto en Bri Flow. Pregúntame sobre nodos, fórmulas o cómo estructurar tu bot.
+              </div>
+            </div>
+          </div>
+
+          <div class="p-3 bg-white border-t flex gap-2 items-center">
+            <input id="copilotChatInput" type="text" placeholder="Tu pregunta..."
+              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm">
+            <button id="copilotChatSend"
+              class="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+              <svg aria-hidden="true" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="22" y1="2" x2="11" y2="13"></line>
+                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+              </svg>
+            </button>
+          </div>
+        </div>
+
+      </div>
+    </div>
+  </div>
+
+  <!-- Initialize AI Copilot -->
+  <script>
+    // Direct initialization of CopilotUI after all scripts are loaded
+    document.addEventListener('DOMContentLoaded', () => {
+      console.log('[HTML] DOMContentLoaded, initializing Copilot...');
+      console.log('[HTML] CopilotUI available:', !!window.CopilotUI);
+      console.log('[HTML] CopilotCore available:', !!window.CopilotCore);
+
+      if (window.CopilotUI && window.CopilotCore) {
+        try {
+          // Create a simple provider (Local mock)
+          let provider = null;
+          if (window.LocalCopilotProvider) {
+            console.log('[HTML] Using LocalCopilotProvider');
+            provider = new window.LocalCopilotProvider();
+          } else if (window.AzureCopilotProvider) {
+            console.log('[HTML] Using AzureCopilotProvider');
+            const config = {
+              endpoint: localStorage.getItem('bri_azure_endpoint') || '',
+              apiKey: localStorage.getItem('bri_azure_key') || ''
+            };
+            provider = new window.AzureCopilotProvider(config);
+          }
+
+          if (provider) {
+            console.log('[HTML] Creating CopilotService...');
+            // Use App.flowManager if available, otherwise create a minimal stub
+            const flowManager = window.App?.flowManager || {
+              getState: () => ({ nodes: {}, connections: [] }),
+              addNodesBulk: (nodes) => console.log('[Mock FlowManager] addNodesBulk called', nodes)
+            };
+
+            const service = new window.CopilotCore.CopilotService(provider, flowManager);
+            console.log('[HTML] Calling CopilotUI.init...');
+            window.CopilotUI.init(service);
+            console.log('[HTML] Copilot initialized successfully');
+          } else {
+            console.warn('[HTML] No Copilot provider available');
+          }
+        } catch (error) {
+          console.error('[HTML] Failed to initialize Copilot:', error);
+        }
+      } else {
+        console.warn('[HTML] CopilotUI or CopilotCore not available');
+      }
+    });
+  </script>
 
 </body>
 
