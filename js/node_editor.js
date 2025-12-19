@@ -263,7 +263,11 @@
               }
               const declared = Array.isArray(startNode.variables) ? startNode.variables.filter(v => v && v.name) : [];
               if (declared.length) {
-                prefix += `<div class="variables-preview">` + declared.map(v => `<div class="var-item"><strong>${v.name}</strong>: ${v.defaultValue || ''}${v.isList ? ' <small>[lista]</small>' : ''}</div>`).join('') + `</div>`;
+                prefix += `<div class="variables-preview">` + declared.map(v => {
+                  let val = v.defaultValue;
+                  if (typeof val === 'object' && val !== null) val = JSON.stringify(val);
+                  return `<div class="var-item"><strong>${v.name}</strong>: ${val || ''}${v.isList ? ' <small>[lista]</small>' : ''}</div>`;
+                }).join('') + `</div>`;
               }
               // other global variables collected from the flow
               try {

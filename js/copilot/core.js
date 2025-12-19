@@ -75,21 +75,36 @@
 
     // --- CopilotService: Facade for the UI ---
     class CopilotService {
-        constructor(provider, flowManager) {
+        constructor(provider) {
             this.provider = provider;
-            this.flowManager = flowManager;
         }
 
-        async generateAndApply(prompt) {
-            // 1. Generate flow fragment from provider
-            const fragment = await this.provider.generate(prompt);
+        get flowManager() {
+            return (global.App && global.App.flowManager) ? global.App.flowManager : global.AppFlowManager;
+        }
 
-            if (!fragment || !fragment.nodes || Object.keys(fragment.nodes).length === 0) {
+        async generateAndApply(prompt, options = {}) {
+            // 1. Generate flow fragment from provider
+            const fragment = await this.provider.generate(prompt, options);
+
+            if (!fragment) {
+                throw new Error('La IA no generó ninguna respuesta válida.');
+            }
+            if (fragment.error === 'off_topic') {
+                throw new Error(fragment.message || 'Solicitud fuera de contexto. Solo puedo generar flujos.');
+            }
+            if (!fragment.nodes || Object.keys(fragment.nodes).length === 0) {
                 throw new Error('La IA no generó ningún nodo válido.');
             }
 
             // 2. Get current state
-            const currentState = this.flowManager.getState();
+            const fm = this.flowManager;
+            if (!fm) throw new Error('FlowManager not initialized (global.AppFlowManager missing)');
+
+            const currentState = fm.getState();
+            // Safety check for state
+            if (!currentState) throw new Error('FlowManager state is null');
+
             const currentNodes = currentState.nodes || {};
 
             // 3. Merge logic
@@ -98,22 +113,58 @@
             // 4. Update state via FlowManager
             // We'll add nodes one by one or bulk update if supported.
             // For safety, let's use a bulk update method if available, or manual injection.
-            this.flowManager.addNodesBulk(mergedNodes);
+            fm.addNodesBulk(mergedNodes);
 
             return mergedNodes;
         }
 
-        async ask(question) {
-            if (this.provider && typeof this.provider.ask === 'function') {
-                return await this.provider.ask(question);
-            }
-            throw new Error('El proveedor de IA no soporta el modo chat.');
+        async ask(question, options = {}) {
+            if (!this.provider) throw new Error('Provider not initialized');
+            // Pass options (context, files, onProgress) to provider
+            return await this.provider.ask(question, options);
         }
+    }
+
+    // --- Provider Factory ---
+    function createProvider(config) {
+        if (config.provider === 'ollama' && global.OllamaCopilotProvider) {
+            console.log('[CopilotCore] Switched to Ollama');
+            return new global.OllamaCopilotProvider(config);
+        }
+        if (global.AzureCopilotProvider) {
+            console.log('[CopilotCore] Switched to Azure');
+            return new global.AzureCopilotProvider(config);
+        }
+        return null;
     }
 
     global.CopilotCore = {
         FlowMerger,
-        CopilotService
+        CopilotService,
+
+        // Singleton service instance
+        serviceInstance: null,
+
+        init(config) {
+            const provider = createProvider(config);
+            if (!provider) console.warn('[CopilotCore] No provider available');
+
+            // We no longer pass flowManager in constructor, it is accessed dynamically
+            this.serviceInstance = new CopilotService(provider);
+
+            // Auto-inject into UI if ready
+            if (global.CopilotUI) {
+                global.CopilotUI.init(this.serviceInstance);
+            }
+        },
+
+        reinitProvider(config) {
+            if (this.serviceInstance) {
+                this.serviceInstance.provider = createProvider(config);
+            } else {
+                this.init(config);
+            }
+        }
     };
 
 })(window);

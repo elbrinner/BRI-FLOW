@@ -158,7 +158,8 @@ Claves y conjuntos:
 
 - `appendUseCaseItem(root, viewName, catalogueName, sectionName, newItem)` → object
 - `normalizeDataJson(root)` → object
-- `buildJourney(root[, currentView[, currentCatalog[, currentSection[, role]]]])` → object
+- `buildJourney(root[, currentView[, currentCatalog[, currentSection[, role[, currentPhase]]]]])` → object
+  - Nota: `currentPhase` es opcional; si no se pasa, se intentará resolver desde el contexto (`viewPhase` o `currentPhase`).
 
 ### Persistencia (dominio)
 

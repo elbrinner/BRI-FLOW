@@ -16,6 +16,68 @@ const FormBuilder = (() => {
     return e;
   }
 
+  // --- Expandable Text Modal Helpers ---
+  let expandedModal = null;
+  let currentInput = null;
+
+  function ensureExpandedModal() {
+    if (expandedModal) return expandedModal;
+    expandedModal = document.createElement('div');
+    expandedModal.id = 'expandedTextModal';
+    expandedModal.className = 'modal-overlay';
+    // Inline styles to ensure it works even if class missing
+    expandedModal.style.cssText = 'display:none; position:fixed; top:0; left:0; width:100%; height:100%; z-index:10000; background:rgba(0,0,0,0.5); align-items:center; justify-content:center;';
+
+    const dialog = document.createElement('div');
+    dialog.className = 'modal-dialog';
+    dialog.style.cssText = 'background:white; width:80%; height:80%; max-width:800px; display:flex; flex-direction:column; padding:20px; border-radius:8px; box-shadow:0 4px 12px rgba(0,0,0,0.15);';
+
+    dialog.innerHTML = `
+      <h3 style="margin-top:0; margin-bottom:10px; font-size:1.1rem; font-weight:bold;">Editar Texto</h3>
+      <textarea id="expandedTextEditor" style="flex:1; width:100%; margin-bottom:10px; font-family:monospace; padding:8px; border:1px solid #ccc; border-radius:4px; resize:none; font-size:14px;"></textarea>
+      <div style="display:flex; justify-content:flex-end; gap:10px;">
+        <button id="expandedTextCancel" type="button" class="px-4 py-2 bg-gray-200 text-gray-800 rounded hover:bg-gray-300">Cancelar</button>
+        <button id="expandedTextSave" type="button" class="px-4 py-2 bg-blue-600 text-white rounded hover:bg-blue-700">Guardar</button>
+      </div>
+    `;
+
+    expandedModal.appendChild(dialog);
+    document.body.appendChild(expandedModal);
+
+    const checkClose = (e) => { if (e.target === expandedModal) closeExpandedModal(); };
+    expandedModal.addEventListener('click', checkClose);
+
+    dialog.querySelector('#expandedTextCancel').onclick = closeExpandedModal;
+    dialog.querySelector('#expandedTextSave').onclick = saveExpandedText;
+
+    return expandedModal;
+  }
+
+  function openExpandedModal(input) {
+    ensureExpandedModal();
+    currentInput = input;
+    const editor = expandedModal.querySelector('#expandedTextEditor');
+    editor.value = input.value || '';
+    expandedModal.style.display = 'flex';
+    setTimeout(() => editor.focus(), 50);
+  }
+
+  function closeExpandedModal() {
+    if (expandedModal) expandedModal.style.display = 'none';
+    currentInput = null;
+  }
+
+  function saveExpandedText() {
+    if (currentInput && expandedModal) {
+      const editor = expandedModal.querySelector('#expandedTextEditor');
+      currentInput.value = editor.value;
+      // Trigger event
+      currentInput.dispatchEvent(new Event('input', { bubbles: true }));
+      currentInput.dispatchEvent(new Event('change', { bubbles: true }));
+    }
+    closeExpandedModal();
+  }
+
   // Factory to create mouse handlers for variable items (keeps nesting shallow)
   function createVarClickHandler(name, insertFn, hideFn) {
     return function (ev) {
@@ -29,44 +91,77 @@ const FormBuilder = (() => {
   function inputRow({ label, id, type = 'text', value = '', placeholder = '' }) {
     const row = el('div', { class: 'form-row' });
     row.appendChild(el('label', { text: label }));
+    const wrapper = el('div', { style: 'display:flex; gap:5px; align-items:center;' });
+
     if (type === 'textarea') {
       const ta = el('textarea', { id });
       ta.value = value || '';
       ta.placeholder = placeholder;
-      // Deshabilitar autocompletado del navegador en todos los textarea
+      ta.style.flex = '1';
       try { ta.setAttribute('autocomplete', 'off'); } catch (_) { }
-      row.appendChild(ta);
+      wrapper.appendChild(ta);
+
+      const expandBtn = el('button', { type: 'button', text: '⤢', title: 'Expandir' });
+      expandBtn.style.cssText = 'padding:0 8px; cursor:pointer; font-size:16px; min-width:32px; height:38px; border:1px solid #ddd; background:#f9f9f9; border-radius:4px;';
+      expandBtn.onclick = () => openExpandedModal(ta);
+      wrapper.appendChild(expandBtn);
     } else {
       const inp = el('input', { id, type });
       inp.value = value || '';
       inp.placeholder = placeholder || '';
-      row.appendChild(inp);
+      inp.style.flex = '1';
+      wrapper.appendChild(inp);
+
+      if (type === 'text') {
+        const expandBtn = el('button', { type: 'button', text: '⤢', title: 'Expandir' });
+        expandBtn.style.cssText = 'padding:0 8px; cursor:pointer; font-size:16px; min-width:32px; height:34px; border:1px solid #ddd; background:#f9f9f9; border-radius:4px;';
+        expandBtn.onclick = () => openExpandedModal(inp);
+        wrapper.appendChild(expandBtn);
+      }
     }
+    row.appendChild(wrapper);
     return row;
   }
 
   function arrayRow({ label, id, value = [] }) {
     const row = el('div', { class: 'form-row' });
     row.appendChild(el('label', { text: label }));
+    const wrapper = el('div', { style: 'display:flex; gap:5px; align-items:center;' });
     const ta = el('textarea', { id });
     if (Array.isArray(value)) ta.value = value.join('\n');
     else ta.value = value ? String(value) : '';
     ta.placeholder = 'Una línea por elemento (para listas simples)';
-    // Deshabilitar autocompletado del navegador
+    ta.style.flex = '1';
     try { ta.setAttribute('autocomplete', 'off'); } catch (_) { }
-    row.appendChild(ta);
+    wrapper.appendChild(ta);
+
+    const expandBtn = el('button', { type: 'button', text: '⤢', title: 'Expandir' });
+    expandBtn.style.cssText = 'padding:0 8px; cursor:pointer; font-size:16px; min-width:32px; height:38px; border:1px solid #ddd; background:#f9f9f9; border-radius:4px;';
+    expandBtn.onclick = () => openExpandedModal(ta);
+    wrapper.appendChild(expandBtn);
+
+    row.appendChild(wrapper);
     return row;
   }
 
   function jsonEditor({ label, id, value = {} }) {
     const row = el('div', { class: 'form-row' });
     row.appendChild(el('label', { text: label }));
+    const wrapper = el('div', { style: 'display:flex; gap:5px; align-items:center;' });
     const ta = el('textarea', { id });
     ta.value = JSON.stringify(value, null, 2);
     ta.placeholder = 'Objeto JSON (edítalo si necesitas estructura más compleja)';
-    // Deshabilitar autocompletado del navegador
+    ta.style.flex = '1';
     try { ta.setAttribute('autocomplete', 'off'); } catch (_) { }
-    row.appendChild(ta);
+    wrapper.appendChild(ta);
+
+    const expandBtn = el('button', { type: 'button', text: '⤢', title: 'Expandir' });
+    expandBtn.style.cssText = 'padding:0 8px; cursor:pointer; font-size:16px; min-width:32px; height:38px; border:1px solid #ddd; background:#f9f9f9; border-radius:4px;';
+    expandBtn.onclick = () => openExpandedModal(ta);
+    wrapper.appendChild(expandBtn);
+
+    row.appendChild(wrapper);
+
     const msg = el('div', { class: 'json-error', 'aria-live': 'polite' });
     msg.style.color = '#b00020'; msg.style.fontSize = '12px'; msg.style.minHeight = '1.2em'; msg.style.marginTop = '4px';
     row.appendChild(msg);
@@ -111,7 +206,7 @@ const FormBuilder = (() => {
       fields.forEach((f, i) => {
         const item = el('div', { class: 'field-item', 'data-index': String(i) });
         item.style.border = '1px solid #eee'; item.style.padding = '6px'; item.style.marginBottom = '6px';
-        item.appendChild(el('div', { text: `#${i + 1} - ${f.name}` }));
+        item.appendChild(el('div', { text: `#${i + 1} - ${f.name} ` }));
         const name = el('input', { type: 'text', value: f.name, 'data-field': 'name', 'data-index': String(i) });
         const labelInp = el('input', { type: 'text', value: f.label, 'data-field': 'label', 'data-index': String(i) });
         const typeSel = createTypeSelect(f.type, i);
@@ -372,11 +467,24 @@ const FormBuilder = (() => {
           // If it's an object, stringify it for display
           let valStr = '';
           if (typeof v.defaultValue === 'object' && v.defaultValue !== null) {
-            valStr = JSON.stringify(v.defaultValue);
+            valStr = JSON.stringify(v.defaultValue); // No pretty print to save space, user can expand
           } else {
             valStr = String(v.defaultValue || '');
           }
           inputControl.value = valStr;
+
+          inputControl.style.flex = '1';
+          // Wrap in local wrapper for expander
+          const wrapperJson = el('div', { style: 'display:flex; gap:5px; align-items:center;' });
+          wrapperJson.appendChild(inputControl);
+
+          const expandBtn = el('button', { type: 'button', text: '⤢', title: 'Expandir' });
+          expandBtn.style.cssText = 'padding:0 5px; cursor:pointer; border:1px solid #ddd; background:#f9f9f9; border-radius:4px; margin-left:2px; height:auto; align-self:stretch;';
+          expandBtn.onclick = () => openExpandedModal(inputControl);
+          wrapperJson.appendChild(expandBtn);
+
+          // Re-target inputControl to wrapper so it gets appended to row2
+          inputControl = wrapperJson;
 
         } else {
           // String (default)
@@ -508,7 +616,7 @@ const FormBuilder = (() => {
           if (typeof val === 'string') val = JSON.parse(val);
         } catch (e) { /* keep as string if parse fails, or set null? */ }
       } else {
-        val = (val || '').trim();
+        val = String(val == null ? '' : val).trim();
       }
 
       return {
@@ -531,6 +639,7 @@ const FormBuilder = (() => {
     fieldsEditor,
     mappingsEditor,
     variablesEditor,
+    openExpandedModal,
     // attach simple autocomplete for variables. options: { format: 'mustache'|'context'|'dollar' }
     attachVarAutocomplete: function (input, options = {}) {
       if (!input) return;
@@ -566,7 +675,7 @@ const FormBuilder = (() => {
       function getSuggestions() {
         const vars = getVars();
         const base = [
-          ...vars.map(v => `context.${v}`),
+          ...vars.map(v => `context.${v} `),
           'context.input',
           'context.count',
           'context.items',
@@ -754,7 +863,7 @@ const FormBuilder = (() => {
     if (!save_as) {
       // default sugerido igual que en renderer: selected_button_<nodeId>
       const nid = window.App?.state?.selectedNodeId || window.App?.state?.editingNode?.id || null;
-      if (nid) save_as = `selected_button_${nid}`;
+      if (nid) save_as = `selected_button_${nid} `;
     }
 
     let next = null;
@@ -824,7 +933,7 @@ const FormBuilder = (() => {
   // multi_button comparte casi toda la UI con button (renderer reutilizado),
   // pero puede añadir campos específicos (min/max/defaults) si el renderer los renderiza.
   function readMultiButton(container) {
-    // En vez de reutilizar totalmente readButton (que busca `.button-item` y campos i18n_text_*),
+    // En vez de reutilizar totalmente readButton (que busca `.button - item` y campos i18n_text_*),
     // leemos del panel dedicado (ids mb_*) y preservamos las opciones ya presentes en el nodo.
     const out = {};
 
@@ -845,7 +954,7 @@ const FormBuilder = (() => {
     let save_as = (container.querySelector('#mb_save_as input, #mb_save_as')?.value || '').trim();
     if (!save_as) {
       const nid = window.App?.state?.selectedNodeId || window.App?.state?.editingNode?.id || null;
-      if (nid) save_as = `selected_multi_${nid}`;
+      if (nid) save_as = `selected_multi_${nid} `;
     }
     if (save_as) out.save_as = save_as;
 
@@ -865,7 +974,7 @@ const FormBuilder = (() => {
       // En dinámico, no exportamos opciones estáticas
       out.options = [];
     } else {
-      // En estático, intentar leer filas `.mb-item`; si no, preservar las del nodo actual
+      // En estático, intentar leer filas `.mb - item`; si no, preservar las del nodo actual
       const rows = container.querySelectorAll('.mb-item');
       const options = [];
       rows.forEach(row => {
@@ -1277,7 +1386,7 @@ const FormBuilder = (() => {
         Object.keys(nodesDict).forEach(nid => {
           if (nid === node.id) return; // evitar self-loop
           const n = nodesDict[nid];
-          const label = (n?.type === 'start') ? `🚀 ${nid} (start)` : `${nid} · ${n?.type || ''}`.trim();
+          const label = (n?.type === 'start') ? `🚀 ${nid} (start)` : `${nid} · ${n?.type || ''} `.trim();
           nodeSel.appendChild(el('option', { value: nid, text: label }));
         });
         const want = (node.next?.node_id) || currentVal || '';

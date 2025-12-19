@@ -67,8 +67,10 @@
       case 'extra': return await handleExtra(node, locale);
       case 'assign_var': return await handleAssignVar(node);
       case 'condition': return await handleCondition(node);
-      case 'set_goto': return await handleSetGoto(node);
+
       case 'rest_call': return await handleRestCall(node);
+      case 'debug': return await handleDebug(node);
+      case 'flow_jump': return await handleFlowJump(node);
       case 'end': return await handleEnd(node, locale);
       default: return resolveNext(node.next);
     }
@@ -273,11 +275,7 @@
     }
   }
 
-  async function handleSetGoto(node) {
-    // Configurar la variable goto
-    window.App.runtimeContext.variables['goto'] = node.target || '';
-    return resolveNext(node.next);
-  }
+
 
   // Loop handler: it iterates a source list variable, sets item/index vars and executes simple actions
   async function handleLoop(node) {
@@ -589,8 +587,173 @@
     return resolveNext(node.next);
   }
 
+  async function handleDebug(node) {
+    // Check if debug is enabled globally (from Start node or context)
+    const ctx = window.App.runtimeContext;
+    const startId = window.App?.state?.meta?.start_node;
+    const startNode = startId ? window.App.state.nodes[startId] : null;
+
+    // Priority: context override > start node setting
+    const enabled = ctx.variables['enable_debug'] === true || (startNode && startNode.enable_debug === true);
+
+    if (enabled) {
+      const msgRaw = node.message || '';
+      let msg = '';
+      try { msg = renderTemplate(msgRaw); } catch (e) { msg = msgRaw; }
+
+      // 1. Process Debug Items (List)
+      let debugData = {};
+      if (Array.isArray(node.debug_items)) {
+        node.debug_items.forEach(item => {
+          if (!item.label) return;
+          const valRaw = item.value || '';
+          let val = valRaw;
+          try {
+            // Evaluate as expression if string
+            if (window.ExpressionParser && typeof window.ExpressionParser.evaluate === 'function') {
+              // check if it looks like an expression {{...}} or just var name? 
+              // If user puts "user.name" (no braces), we might want to eval it? 
+              // But standard in this UI is {{expr}}. Let's try resolveTemplate logic manually or standard eval.
+              // renderTemplate handles {{...}}. If no braces, it returns string.
+              // If user wants variable value without braces, renderTemplate won't do it unless we assume it's Expr.
+              // Current plan said "Value: {{saldo}}", so renderTemplate is enough.
+              val = renderTemplate(valRaw);
+            } else {
+              val = valRaw;
+            }
+          } catch (e) { val = "Error: " + e.message; }
+          debugData[item.label] = val;
+        });
+      }
+
+      // 2. Process Raw Payload (Advanced Override)
+      const payloadRaw = node.payload;
+      let payload = null;
+      if (payloadRaw) {
+        if (typeof payloadRaw === 'string') {
+          try {
+            const rendered = renderTemplate(payloadRaw);
+            // Try to parse as JSON
+            if (rendered && (rendered.trim().startsWith('{') || rendered.trim().startsWith('['))) {
+              try { payload = JSON.parse(rendered); } catch (e) { payload = rendered; }
+            } else {
+              payload = rendered;
+            }
+          } catch (e) { payload = payloadRaw; }
+        } else {
+          payload = payloadRaw;
+        }
+      }
+
+      // Combined Output
+      // If payload exists, it might override items or sit beside them. 
+      // Let's preserve items in debugData, and if payload exists, add it as separate field.
+      const finalOutput = { ...debugData };
+      if (payload !== null) finalOutput['_payload'] = payload;
+
+      console.log(`[DEBUG NODE ${node.id}]`, msg, finalOutput);
+
+      // 3. Visual Render (FlowUI)
+      if (window.FlowUI && typeof window.FlowUI.showNodeUI === 'function') {
+        const contextHtml = `<div style="margin-top:12px;font-size:12px;color:#333">Context (Full): <pre class='contextPreview' style='background:#f6f6f6;padding:8px;border-radius:4px;height:80px;overflow:auto'>${JSON.stringify(ctx, null, 2)}</pre></div>`;
+
+        // Build Table for Items
+        let tableHtml = '';
+        const keys = Object.keys(debugData);
+        if (keys.length > 0) {
+          tableHtml += '<table style="width:100%; border-collapse:collapse; margin-top:8px; font-size:13px;">';
+          tableHtml += '<tr style="background:#f0f0f0; text-align:left;"><th style="padding:4px; border:1px solid #ddd;">Etiqueta</th><th style="padding:4px; border:1px solid #ddd;">Valor</th></tr>';
+          keys.forEach(k => {
+            let v = debugData[k];
+            if (typeof v === 'object') v = JSON.stringify(v);
+            tableHtml += `<tr><td style="padding:4px; border:1px solid #ddd; font-weight:600;">${k}</td><td style="padding:4px; border:1px solid #ddd; color:#0056b3;">${v}</td></tr>`;
+          });
+          tableHtml += '</table>';
+        }
+
+        let payloadHtml = '';
+        if (payload !== null) {
+          payloadHtml = `<div style="margin-top:8px;"><strong>Raw Payload:</strong><pre style="background:#fff3cd; padding:6px; font-size:11px; max-height:100px; overflow:auto;">${typeof payload === 'object' ? JSON.stringify(payload, null, 2) : payload}</pre></div>`;
+        }
+
+        const html = `
+            <div style="border-left: 4px solid #ffc107; padding-left: 8px;">
+               <div style="font-weight:700; color:#d39e00; margin-bottom:4px">🛠 DEBUG: ${node.id}</div>
+               <div style="font-size:14px; margin-bottom:8px; font-weight:bold; white-space: pre-wrap;">${msg}</div>
+               ${tableHtml}
+               ${payloadHtml}
+               ${contextHtml}
+               <div style="text-align:right; margin-top:12px;">
+                  <button id="runnerDebugNext" style="background:#ffc107; border:1px solid #d39e00; color:#000; padding:6px 12px; cursor:pointer; font-weight:bold; border-radius:4px;">Continuar ▶</button>
+               </div>
+            </div>`;
+
+        const { card } = window.FlowUI.showNodeUI(html);
+        await window.FlowUI.waitForClick(card, '#runnerDebugNext');
+        window.FlowUI.hideModal ? window.FlowUI.hideModal() : null; // Close current card/modal
+      }
+
+      // Save to variable
+      if (node.save_as) {
+        ctx.variables[node.save_as] = { message: msg, data: debugData, payload: payload, timestamp: Date.now() };
+      }
+
+    } else {
+      // Debug disabled: skip silently
+    }
+    return resolveNext(node.next);
+  }
+
+  async function handleFlowJump(node) {
+    const ctx = window.App.runtimeContext;
+    const targetFlowId = node.target?.flow_id;
+    const targetNodeId = node.target?.node_id;
+
+    if (!targetFlowId) {
+      console.warn('[FlowRunner] flow_jump: missing target flow_id', node.id);
+      return resolveNext(node.next); // Fallback to next connection if configured, though plan says ignore. Let's fallback for safety.
+    }
+
+    // Handle return on end
+    if (node.return_on_end) {
+      // Determine where to return
+      let returnFlowId = node.return_target?.flow_id || ctx.currentFlowId;
+      let returnNodeId = node.return_target?.node_id || node.next?.node_id || null; // Fallback to next if no explicit return node
+
+      // Push to call stack
+      if (!ctx.callStack) ctx.callStack = [];
+      ctx.callStack.push({
+        flow_id: returnFlowId,
+        node_id: returnNodeId
+      });
+      console.log(`[FlowRunner] flow_jump: pushing to stack. Return to ${returnFlowId}::${returnNodeId}`);
+    }
+
+    // Switch flow
+    console.log(`[FlowRunner] flow_jump: jumping to ${targetFlowId}::${targetNodeId}`);
+    setActiveFlow(targetFlowId);
+
+    // Return target node (start node handled in runFlow/resolveNext if null targetNodeId?)
+    // resolveNext handles null by returning start_node.
+    return targetNodeId || (window.App?.state?.meta?.start_node || null);
+  }
+
   async function handleEnd(node, locale) {
     const ctx = window.App.runtimeContext;
+
+    // Check call stack for return
+    if (ctx.callStack && ctx.callStack.length > 0) {
+      const returnPoint = ctx.callStack.pop();
+      if (returnPoint && returnPoint.flow_id) {
+        console.log(`[FlowRunner] end: popping stack. Returning to ${returnPoint.flow_id}::${returnPoint.node_id}`);
+        setActiveFlow(returnPoint.flow_id);
+        // If returnNodeId is null, what do we do? 
+        // Usually return from subflow implies we continue. If no node, verify resolveNext behavior.
+        // But here we need to return an ID to the loop in runFlow.
+        return returnPoint.node_id || resolveNext({ flow_id: returnPoint.flow_id, node_id: null });
+      }
+    }
+
     const contextHtml = `<div style="margin-top:12px;font-size:12px;color:#333">Context: <pre class='contextPreview' style='background:#f6f6f6;padding:8px;border-radius:4px;height:120px;overflow:auto'>${JSON.stringify(ctx, null, 2)}</pre></div>`;
     const html = `<div><div style="font-weight:700;margin-bottom:8px">End: ${node.id}</div><div>Fin del flujo.</div>${contextHtml}<div style="text-align:right;margin-top:8px"><button id="runnerClose">Cerrar</button></div></div>`;
     const { card } = window.FlowUI.showNodeUI(html);
@@ -603,6 +766,8 @@
     console.log('[FlowRunner] runFlow called');
     window.App = window.App || {};
     window.App.runtimeContext = window.App.runtimeContext || { variables: {} };
+    // Initialize call stack
+    window.App.runtimeContext.callStack = [];
     // Initialize variables from start node definitions if present (parse JSON strings and coerce simple types)
     try {
       const startNodeId = window.App?.state?.meta?.start_node || null;

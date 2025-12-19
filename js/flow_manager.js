@@ -79,5 +79,39 @@
         dependencies.refreshOutput?.();
     }
 
-    window.AppFlowManager = { init, deleteNode, duplicateNode };
+    function getState() {
+        return stateRef;
+    }
+
+    function addNodesBulk(newNodes) {
+        if (!stateRef) return;
+
+        // Add nodes to state
+        Object.keys(newNodes).forEach(id => {
+            stateRef.nodes[id] = newNodes[id];
+        });
+
+        // Record for undo (using individual adds for now, or we could implement a BulkCommand)
+        if (window.AppHistoryManager) {
+            // Potentially we could group this, but for now let's just record them
+            // Ideally Copilot operations should be one undo step. 
+            // We can implement a composite command later.
+            Object.keys(newNodes).forEach(id => {
+                const command = window.AppHistoryManager.createAddNodeCommand(id, newNodes[id]);
+                window.AppHistoryManager.recordCommand(command);
+            });
+        }
+
+        // Render nodes
+        if (dependencies.renderNode) {
+            Object.keys(newNodes).forEach(id => {
+                dependencies.renderNode(newNodes[id]);
+            });
+        }
+
+        // Refresh output
+        dependencies.refreshOutput?.();
+    }
+
+    window.AppFlowManager = { init, deleteNode, duplicateNode, getState, addNodesBulk };
 })();

@@ -50,7 +50,7 @@
           </span>
         </button>
 
-          <button id="btnShowJson" title="Ver JSON generado" class="px-3 py-1 bg-white border rounded text-sm">
+        <button id="btnShowJson" title="Ver JSON generado" class="px-3 py-1 bg-white border rounded text-sm">
           <span class="inline-flex items-center gap-2">
             <!-- Code brackets icon -->
             <svg aria-hidden="true" class="w-4 h-4 text-gray-700" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -71,7 +71,7 @@
               <rect x="7" y="14" width="10" height="5" fill="white" opacity="0.9"></rect>
               <rect x="9" y="15" width="6" height="2.5" rx="0.5" class="fill-gray-300"></rect>
             </svg>
-            
+
           </span>
         </button>
         <button id="btnOpenSimulatorModal" title="Abrir simulador en modal"
@@ -94,7 +94,7 @@
         </button>
         <div class="w-px h-6 bg-gray-300 mx-1"></div>
 
-      
+
 
         <span class="zoom-controls inline-flex items-center gap-2 ml-2">
           <button id="zoomOut" title="Alejar" class="px-2 py-1 bg-white border rounded">−</button>
@@ -113,7 +113,7 @@
 
         </span>
 
-         <!-- AI Copilot Button -->
+        <!-- AI Copilot Button -->
         <button id="btnAiCopilot" title="Bri AI Assintent"
           class="px-2 py-1 bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white border-0 rounded shadow-sm hover:shadow-md transition-all"
           aria-label="AI Assist">
@@ -121,7 +121,7 @@
             <span aria-hidden="true">✨</span>
           </span>
         </button>
-        
+
         <!-- Botón de ayuda global -->
         <button id="btnHelpDoc" title="Ayuda de expresiones (len, split, etc.)"
           class="px-2 py-1 bg-white border rounded" aria-label="Ayuda">
@@ -130,7 +130,7 @@
           </span>
         </button>
 
-       
+
 
         <input id="importFile" type="file" accept=".json" multiple
           class="text-sm file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-600 file:text-white hover:file:bg-blue-700 hidden" />
@@ -158,7 +158,7 @@
             <div class="draggable" draggable="true" data-type="end" title="Nodo fin del flujo">🏁 End</div>
             <div class="draggable" draggable="true" data-type="debug" title="Nodo debug: muestra mensaje y datos">🐛
               Debug</div>
-            <div class="draggable" draggable="true" data-type="set_goto">🔙 Set Goto</div>
+
             <div class="draggable" draggable="true" data-type="flow_jump"
               title="Llama a otro flujo y puede volver al origen">⤴️ Flow Jump</div>
           </div>
@@ -334,7 +334,6 @@
   <script src="js/renderers/assign_var.js"></script>
   <script src="js/renderers/condition.js"></script>
   <script src="js/renderers/flow_jump.js"></script>
-  <script src="js/renderers/set_goto.js"></script>
   <script src="js/renderers/start.js"></script>
   <script src="js/renderers/hero_card.js"></script>
   <script src="js/renderers/carousel.js"></script>
@@ -371,10 +370,6 @@
   <script src="js/flow_importer.js"></script>
   <script src="js/flow_manager.js"></script>
   <!-- AI Copilot Scripts (must load before main.js) -->
-  <script src="js/copilot_local.js"></script>
-  <script src="js/copilot_azure.js"></script>
-  <script src="js/copilot_core.js"></script>
-  <script src="js/copilot_ui.js"></script>
   <script src="js/main.js"></script>
   <script src="js/project_flows.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@12.0.0/lib/marked.umd.js"></script>
@@ -609,6 +604,9 @@
           <button id="btnProfilesManager" class="px-3 py-1 bg-white border rounded text-sm"
             title="Gestionar perfiles del simulador">Perfiles</button>
 
+          <button id="btnSimulatorSettings" class="px-3 py-1 bg-white border rounded text-sm"
+            title="Configurar backend del simulador">Configuración</button>
+
           <button id="btnShowHelp" class="px-3 py-1 bg-white border rounded text-sm" title="Mostrar ayuda">?</button>
           <button id="simulatorModalClose" class="text-gray-600 hover:text-gray-900">✕</button>
         </div>
@@ -680,141 +678,32 @@
       </div>
     </div>
   </div>
-  <div id="copilotModal"
-    class="fixed inset-0 z-[400] hidden items-center justify-center bg-black bg-opacity-50 backdrop-blur-sm"
-    aria-hidden="true" role="dialog" aria-modal="true">
-    <div
-      class="w-full max-w-lg bg-white rounded-xl shadow-2xl overflow-hidden transform transition-all scale-100 flex flex-col h-[600px]">
-      <div class="bg-gradient-to-r from-indigo-600 to-purple-600 p-4 flex items-center justify-between shrink-0">
-        <h3 class="text-lg font-bold text-white flex items-center gap-2">
-          <span>✨</span> AI Copilot
-        </h3>
-        <button id="copilotModalClose" class="text-white/80 hover:text-white transition-colors">✕</button>
-      </div>
+  <!-- AI Copilot Container (Loaded dynamically) -->
+  <div id="copilotContainer"></div>
 
-      <!-- Tabs -->
-      <div class="flex border-b shrink-0">
-        <button id="tabGen"
-          class="flex-1 py-3 text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 bg-indigo-50 hover:bg-indigo-100 transition-colors">
-          Flow Generator
-        </button>
-        <button id="tabChat"
-          class="flex-1 py-3 text-sm font-semibold text-gray-500 hover:text-indigo-600 hover:bg-gray-50 transition-colors">
-          Ask Expert
-        </button>
-      </div>
+  <!-- AI Copilot Scripts (must load before main.js) -->
+  <script src="js/copilot/local.js"></script>
+  <script src="js/copilot/core.js"></script>
+  <script src="js/copilot/ui.js"></script>
+  <script src="js/copilot/azure.js"></script>
+  <script src="js/copilot/ollama.js"></script>
 
-      <!-- Content Area -->
-      <div class="flex-1 overflow-hidden relative">
-
-        <!-- Generator Tab -->
-        <div id="panelGen" class="absolute inset-0 flex flex-col p-6 space-y-4 overflow-y-auto">
-          <div>
-            <label for="copilotPrompt" class="block text-sm font-medium text-gray-700 mb-2">
-              Describe el flujo que deseas crear:
-            </label>
-            <textarea id="copilotPrompt"
-              class="w-full h-32 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent resize-none text-sm"
-              placeholder="Ej: Crea un flujo para agendar una cita médica. Primero pide el nombre, luego la especialidad, y finalmente confirma la fecha."></textarea>
-            <p class="text-xs text-gray-500 mt-2 text-right">
-              Powered by <span class="font-semibold text-purple-600">Bri Copilot V1</span>
-            </p>
-          </div>
-
-          <div id="copilotError" class="hidden p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-100">
-          </div>
-
-          <div class="mt-auto pt-4 border-t flex justify-end gap-3">
-            <button id="copilotBtnCancel"
-              class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium text-sm transition-colors">Cancelar</button>
-            <button id="copilotBtnGenerate"
-              class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 font-medium text-sm shadow-md transition-all flex items-center gap-2">
-              <span>Generar Flujo</span>
-              <svg id="copilotSpinner" class="animate-spin h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg"
-                fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor"
-                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
-                </path>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-        <!-- Chat Tab -->
-        <div id="panelChat" class="absolute inset-0 flex flex-col hidden bg-gray-50">
-          <div id="copilotChatHistory" class="flex-1 overflow-y-auto p-4 space-y-3">
-            <div class="flex gap-2 items-start">
-              <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">🤖</div>
-              <div
-                class="bg-white p-3 rounded-tr-xl rounded-br-xl rounded-bl-xl shadow-sm text-sm text-gray-700 border">
-                Hola, soy tu experto en Bri Flow. Pregúntame sobre nodos, fórmulas o cómo estructurar tu bot.
-              </div>
-            </div>
-          </div>
-
-          <div class="p-3 bg-white border-t flex gap-2 items-center">
-            <input id="copilotChatInput" type="text" placeholder="Tu pregunta..."
-              class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm">
-            <button id="copilotChatSend"
-              class="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
-              <svg aria-hidden="true" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
-                stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-                <line x1="22" y1="2" x2="11" y2="13"></line>
-                <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
-              </svg>
-            </button>
-          </div>
-        </div>
-
-      </div>
-    </div>
-  </div>
-
-  <!-- Initialize AI Copilot -->
+  <!-- Initialization -->
   <script>
-    // Direct initialization of CopilotUI after all scripts are loaded
     document.addEventListener('DOMContentLoaded', () => {
-      console.log('[HTML] DOMContentLoaded, initializing Copilot...');
-      console.log('[HTML] CopilotUI available:', !!window.CopilotUI);
-      console.log('[HTML] CopilotCore available:', !!window.CopilotCore);
-
-      if (window.CopilotUI && window.CopilotCore) {
-        try {
-          // Create a simple provider (Local mock)
-          let provider = null;
-          if (window.LocalCopilotProvider) {
-            console.log('[HTML] Using LocalCopilotProvider');
-            provider = new window.LocalCopilotProvider();
-          } else if (window.AzureCopilotProvider) {
-            console.log('[HTML] Using AzureCopilotProvider');
-            const config = {
-              endpoint: localStorage.getItem('bri_azure_endpoint') || '',
-              apiKey: localStorage.getItem('bri_azure_key') || ''
-            };
-            provider = new window.AzureCopilotProvider(config);
-          }
-
-          if (provider) {
-            console.log('[HTML] Creating CopilotService...');
-            // Use App.flowManager if available, otherwise create a minimal stub
-            const flowManager = window.App?.flowManager || {
-              getState: () => ({ nodes: {}, connections: [] }),
-              addNodesBulk: (nodes) => console.log('[Mock FlowManager] addNodesBulk called', nodes)
-            };
-
-            const service = new window.CopilotCore.CopilotService(provider, flowManager);
-            console.log('[HTML] Calling CopilotUI.init...');
-            window.CopilotUI.init(service);
-            console.log('[HTML] Copilot initialized successfully');
-          } else {
-            console.warn('[HTML] No Copilot provider available');
-          }
-        } catch (error) {
-          console.error('[HTML] Failed to initialize Copilot:', error);
-        }
+      // Init Copilot if available
+      if (window.CopilotCore) {
+        CopilotCore.init({
+          provider: localStorage.getItem('bri_cp_provider') || 'azure',
+          azureEndpoint: localStorage.getItem('bri_azure_endpoint'),
+          azureKey: localStorage.getItem('bri_azure_key'),
+          azureModel: localStorage.getItem('bri_azure_model'),
+          ollamaEndpoint: localStorage.getItem('bri_ollama_endpoint'),
+          ollamaModel: localStorage.getItem('bri_ollama_model')
+        });
+        console.log('[HTML] Copilot initialized successfully');
       } else {
-        console.warn('[HTML] CopilotUI or CopilotCore not available');
+        console.warn('[HTML] CopilotCore not found');
       }
     });
   </script>

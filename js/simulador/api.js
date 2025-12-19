@@ -6,6 +6,121 @@
 
     const API = {};
 
+    const LS_BACKEND_SETTINGS = 'sim.backend.settings.v1';
+
+    function readBackendSettingsLS() {
+        try {
+            if (typeof localStorage === 'undefined') return null;
+            const raw = localStorage.getItem(LS_BACKEND_SETTINGS);
+            if (!raw) return null;
+            const obj = JSON.parse(raw);
+            if (!obj || typeof obj !== 'object') return null;
+            return obj;
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    function writeBackendSettingsLS(settings) {
+        try {
+            if (typeof localStorage === 'undefined') return;
+            const safe = {
+                baseUrl: settings && settings.baseUrl ? String(settings.baseUrl) : '',
+                forceBackend: !!(settings && settings.forceBackend),
+                updatedAt: new Date().toISOString()
+            };
+            localStorage.setItem(LS_BACKEND_SETTINGS, JSON.stringify(safe));
+        } catch (_e) { }
+    }
+
+    function getStartNode() {
+        try {
+            const flow = window.Simulador && window.Simulador.flow ? window.Simulador.flow.currentFlow : null;
+            if (!flow || !flow._nodes) return null;
+            const startId = flow._start || flow.start_node || null;
+            if (!startId) return null;
+            return flow._nodes[startId] || null;
+        } catch (_e) {
+            return null;
+        }
+    }
+
+    function normalizeBaseUrl(url) {
+        try {
+            const s = String(url || '').trim();
+            return s.replace(/\/$/, '');
+        } catch (_e) {
+            return '';
+        }
+    }
+
+    API.getBackendSettings = function () {
+        const startNode = getStartNode();
+        const startBackendUrl = startNode && startNode.backend_url ? String(startNode.backend_url) : '';
+        const startApiKey = startNode && startNode.api_key ? String(startNode.api_key) : '';
+
+        const ls = readBackendSettingsLS() || {};
+        let baseUrl = ls.baseUrl ? String(ls.baseUrl) : '';
+        let source = baseUrl ? 'localStorage' : '';
+
+        // Backward-compatible keys
+        if (!baseUrl) {
+            try {
+                if (typeof localStorage !== 'undefined') {
+                    const legacy = localStorage.getItem('sim.agent_api_base');
+                    if (legacy && legacy.trim()) {
+                        baseUrl = legacy.trim();
+                        source = 'localStorage(sim.agent_api_base)';
+                    }
+                }
+            } catch (_e) { }
+        }
+
+        // Flow config (Start node)
+        if (!baseUrl && startBackendUrl) {
+            baseUrl = startBackendUrl;
+            source = 'flow(start.backend_url)';
+        }
+
+        // Local JSON config
+        if (!baseUrl) {
+            try {
+                if (window.SIM_LOCAL_CONFIG && window.SIM_LOCAL_CONFIG.agent_api_base) {
+                    baseUrl = String(window.SIM_LOCAL_CONFIG.agent_api_base);
+                    source = 'SIM_LOCAL_CONFIG.agent_api_base';
+                }
+            } catch (_e) { }
+        }
+
+        if (!baseUrl) {
+            baseUrl = (window.location && window.location.origin) ? window.location.origin : 'http://localhost:5000';
+            source = 'default(origin)';
+        }
+
+        return {
+            baseUrl: normalizeBaseUrl(baseUrl),
+            apiKey: startApiKey,
+            forceBackend: !!ls.forceBackend,
+            source
+        };
+    };
+
+    API.setBackendSettings = function ({ baseUrl, forceBackend } = {}) {
+        const normalized = normalizeBaseUrl(baseUrl);
+        writeBackendSettingsLS({ baseUrl: normalized, forceBackend: !!forceBackend });
+        // Backward-compatible key used by legacy pieces
+        try {
+            if (typeof localStorage !== 'undefined') {
+                if (normalized) localStorage.setItem('sim.agent_api_base', normalized);
+            }
+        } catch (_e) { }
+        return API.getBackendSettings();
+    };
+
+    API.getAgentApiBase = function () {
+        return API.getBackendSettings().baseUrl;
+    };
+
     // Load local config
     API.loadLocalConfig = async function () {
         try {
@@ -90,4 +205,16 @@
     };
 
     window.Simulador.api = API;
+
+    // Global helper used by simulador-agents.js
+    if (typeof window.getAgentApiBase !== 'function') {
+        window.getAgentApiBase = function () {
+            try {
+                if (window.Simulador && window.Simulador.api && typeof window.Simulador.api.getAgentApiBase === 'function') {
+                    return window.Simulador.api.getAgentApiBase();
+                }
+            } catch (_e) { }
+            try { return (window.location && window.location.origin) ? window.location.origin : 'http://localhost:5000'; } catch (_e) { return 'http://localhost:5000'; }
+        };
+    }
 })();

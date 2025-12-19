@@ -170,16 +170,19 @@
             const viewportWInContent = (canvas.clientWidth - padL - padR) / z;
             const viewportHInContent = (canvas.clientHeight - padT - padB) / z;
 
-            if (left < (canvas.scrollLeft - padL) + marginContent) {
-                targetLeft = Math.max(0, Math.floor(padL + left - marginContent));
-            } else if (left + width > (canvas.scrollLeft - padL) + viewportWInContent - marginContent) {
-                targetLeft = Math.max(0, Math.floor(padL + (left + width) - viewportWInContent + marginContent));
+            const currentScrollLeftContent = Math.max(0, (canvas.scrollLeft - padL) / z);
+            const currentScrollTopContent = Math.max(0, (canvas.scrollTop - padT) / z);
+
+            if (left < currentScrollLeftContent + marginContent) {
+                targetLeft = Math.max(0, Math.floor((left - marginContent) * z + padL));
+            } else if (left + width > currentScrollLeftContent + viewportWInContent - marginContent) {
+                targetLeft = Math.max(0, Math.floor(((left + width) - viewportWInContent + marginContent) * z + padL));
             }
 
-            if (top < (canvas.scrollTop - padT) + marginContent) {
-                targetTop = Math.max(0, Math.floor(padT + top - marginContent));
-            } else if (top + height > (canvas.scrollTop - padT) + viewportHInContent - marginContent) {
-                targetTop = Math.max(0, Math.floor(padT + (top + height) - viewportHInContent + marginContent));
+            if (top < currentScrollTopContent + marginContent) {
+                targetTop = Math.max(0, Math.floor((top - marginContent) * z + padT));
+            } else if (top + height > currentScrollTopContent + viewportHInContent - marginContent) {
+                targetTop = Math.max(0, Math.floor(((top + height) - viewportHInContent + marginContent) * z + padT));
             }
 
             if (targetLeft !== canvas.scrollLeft) canvas.scrollLeft = targetLeft;

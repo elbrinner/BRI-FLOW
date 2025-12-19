@@ -59,7 +59,6 @@
       dest.item_var = src.item_var || src.itemVar || 'item';
       dest.index_var = src.index_var || 'index';
       dest.body_start = src.body_start || null;
-      dest.after_loop = src.after_loop || null;
       if (dest.mode === 'while') dest.cond = src.cond || src.condition || '';
       else dest.cond = src.cond || '';
       if (Array.isArray(src.variables)) dest.variables = JSON.parse(JSON.stringify(src.variables));

@@ -46,7 +46,12 @@
   Agents.runAgentCall = async function(node, state, { onText, onMeta, onTool } = {}){
     const wantsStream = !!(node.stream || node.props?.stream);
     const agentProfile = node.agent_profile || node.props?.agent_profile || 'normal';
+    const backendSettings = (window.Simulador?.api?.getBackendSettings && typeof window.Simulador.api.getBackendSettings === 'function')
+      ? (window.Simulador.api.getBackendSettings() || {})
+      : {};
+    const forceBackend = !!backendSettings.forceBackend;
     const base = (typeof window.getAgentApiBase === 'function') ? window.getAgentApiBase() : (window.location.origin || 'http://localhost:5000');
+    const apiKey = backendSettings.apiKey ? String(backendSettings.apiKey) : '';
 
     // Mock config
     const localCfg = (window.SIM_LOCAL_CONFIG && window.SIM_LOCAL_CONFIG.agent) ? window.SIM_LOCAL_CONFIG.agent : {};
@@ -103,7 +108,7 @@
     }
 
     const canDirect = ['normal','domain_expert','rag',''].includes(agentProfile);
-    if(canDirect && provider === 'azure-openai'){
+    if(canDirect && provider === 'azure-openai' && !forceBackend){
       try{ return await callAzure(); }catch(e){ if(mockMode==='fallback' && mockData){ return { text: mockData.text || '(mock agent)', mocked:true }; } throw e; }
     }
 
@@ -111,6 +116,10 @@
     const body = Agents.buildAgentRequestFromNode(node, state);
     const url = base.replace(/\/$/,'') + '/api/chat';
     const headers = { 'Content-Type':'application/vnd.agent+json', 'Accept': wantsStream ? 'text/event-stream' : 'application/json' };
+    if(apiKey){
+      if(!headers['Authorization']) headers['Authorization'] = 'Bearer ' + apiKey;
+      if(!headers['x-api-key']) headers['x-api-key'] = apiKey;
+    }
     if(!wantsStream){
       try{
         const res = await fetch(url,{ method:'POST', headers, body: JSON.stringify(body) });

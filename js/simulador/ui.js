@@ -398,6 +398,114 @@
         container.appendChild(wrapper);
     };
 
+    UI.renderBackendSettingsUI = function () {
+        const container = $('simulatorControls');
+        if (!container) return;
+
+        if ($('simBackendSettingsWrap')) return;
+
+        const wrapper = document.createElement('div');
+        wrapper.id = 'simBackendSettingsWrap';
+        wrapper.className = 'mt-4 border-t pt-4 hidden';
+
+        const title = document.createElement('div');
+        title.className = 'flex items-center justify-between';
+        title.innerHTML = '<div class="text-xs font-semibold text-gray-700">⚙ Backend del simulador</div>';
+        wrapper.appendChild(title);
+
+        const hint = document.createElement('div');
+        hint.className = 'mt-1 text-[11px] text-gray-600';
+        hint.textContent = 'Configura la URL del backend y si quieres forzarlo para agent_call. Se guarda en este navegador.';
+        wrapper.appendChild(hint);
+
+        const form = document.createElement('div');
+        form.className = 'mt-2 space-y-2';
+
+        const row1 = document.createElement('label');
+        row1.className = 'flex items-center gap-2 text-xs text-gray-700';
+        row1.innerHTML = '<input id="simBackendForce" type="checkbox" class="border" /> <span>Forzar backend para <code>agent_call</code></span>';
+        form.appendChild(row1);
+
+        const row2 = document.createElement('label');
+        row2.className = 'block text-xs text-gray-700';
+        row2.innerHTML = '<div class="font-semibold mb-1">Backend URL</div>';
+        const input = document.createElement('input');
+        input.id = 'simBackendUrl';
+        input.type = 'text';
+        input.placeholder = 'http://localhost:5000';
+        input.className = 'w-full text-xs border rounded px-2 py-1';
+        row2.appendChild(input);
+        form.appendChild(row2);
+
+        const meta = document.createElement('div');
+        meta.id = 'simBackendMeta';
+        meta.className = 'text-[11px] text-gray-500';
+        form.appendChild(meta);
+
+        wrapper.appendChild(form);
+        container.appendChild(wrapper);
+
+        function refresh() {
+            try {
+                const s = window.Simulador?.api?.getBackendSettings?.() || {};
+                const forceEl = $('simBackendForce');
+                const urlEl = $('simBackendUrl');
+                if (forceEl) forceEl.checked = !!s.forceBackend;
+                if (urlEl) urlEl.value = s.baseUrl || '';
+                const m = $('simBackendMeta');
+                if (m) m.textContent = `Origen: ${s.source || 'n/d'}`;
+            } catch (_e) { }
+        }
+
+        function persist() {
+            try {
+                const forceEl = $('simBackendForce');
+                const urlEl = $('simBackendUrl');
+                const baseUrl = urlEl ? String(urlEl.value || '').trim() : '';
+                const forceBackend = forceEl ? !!forceEl.checked : false;
+                if (window.Simulador?.api?.setBackendSettings) {
+                    window.Simulador.api.setBackendSettings({ baseUrl, forceBackend });
+                } else {
+                    try {
+                        if (typeof localStorage !== 'undefined') {
+                            localStorage.setItem('sim.agent_api_base', baseUrl);
+                            localStorage.setItem('sim.backend.force', forceBackend ? '1' : '0');
+                        }
+                    } catch (_e) { }
+                }
+                refresh();
+                UI.log('Backend settings updated');
+            } catch (_e) { }
+        }
+
+        $('simBackendForce')?.addEventListener('change', persist);
+        $('simBackendUrl')?.addEventListener('change', persist);
+
+        refresh();
+    };
+
+    UI.toggleBackendSettingsUI = function () {
+        // Ensure panel exists (modules can init before modal is opened)
+        try { UI.renderBackendSettingsUI(); } catch (_e) { }
+
+        const wrap = $('simBackendSettingsWrap');
+        if (!wrap) {
+            UI.log('⚠️ No se pudo abrir Configuración: panel no disponible');
+            return;
+        }
+
+        const willShow = wrap.classList.contains('hidden');
+        wrap.classList.toggle('hidden');
+
+        if (willShow) {
+            try { wrap.scrollIntoView({ block: 'nearest' }); } catch (_e) { }
+            try { $('simBackendUrl')?.focus(); } catch (_e) { }
+            UI.log('⚙ Configuración backend abierta');
+        } else {
+            UI.log('⚙ Configuración backend cerrada');
+        }
+    };
+
     UI.handleSendMessage = function () {
         const input = $('simulatorInputBox');
         if (!input) return;
@@ -441,6 +549,17 @@
                 if (e.key === 'Enter') UI.handleSendMessage();
             };
         }
+
+        // Backend settings panel
+        UI.renderBackendSettingsUI();
+        const btnSettings = $('btnSimulatorSettings');
+        if (btnSettings) {
+            btnSettings.addEventListener('click', (e) => {
+                try { e.preventDefault(); } catch (_e) { }
+                UI.toggleBackendSettingsUI();
+            });
+        }
+
         UI.renderEventTriggerUI();
         UI.bindVariableControls();
     };

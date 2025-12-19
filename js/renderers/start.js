@@ -1,12 +1,17 @@
 // start.js - renderer del nodo start
+// start.js - renderer del nodo start
 (function () {
-  const { adoptTemplate, setupValidation, markFieldUsed } = window.RendererHelpers || {};
-  const H = window.FormBuilderHelpers || {};
-  const el = H.el || function (tag, attrs = {}, children = []) { const e = document.createElement(tag); (children || []).forEach(c => e.appendChild(c)); return e; };
-  const jsonEditor = H.jsonEditor || function () { return document.createElement('div'); };
-
   function renderStart(node, container) {
-    container = adoptTemplate(container, 'start', 'start-form-slot');
+    const { adoptTemplate, setupValidation, markFieldUsed } = window.RendererHelpers || {};
+    const H = window.FormBuilderHelpers || {};
+    const el = H.el || function (tag, attrs = {}, children = []) { const e = document.createElement(tag); (children || []).forEach(c => e.appendChild(c)); return e; };
+    const jsonEditor = H.jsonEditor || function () { return document.createElement('div'); };
+
+    if (typeof adoptTemplate === 'function') {
+      container = adoptTemplate(container, 'start', 'start-form-slot');
+    } else {
+      console.warn('adoptTemplate not found, using raw container');
+    }
 
     // Locales TAG editor
     let locales = window.App?.state?.meta?.locales || ['en'];
@@ -56,38 +61,15 @@
     debugCheck.addEventListener('change', (e) => { node.enable_debug = e.target.checked; });
     const debugLabel = document.createElement('label');
     debugLabel.htmlFor = 'start_enable_debug';
-    debugLabel.textContent = ' Enable Global Debug';
+    debugLabel.textContent = ' Habilitar Nodos Debug';
     debugRow.appendChild(debugCheck);
     debugRow.appendChild(debugLabel);
     container.appendChild(debugRow);
 
-    // Backend Config
-    const backendRow = document.createElement('div');
-    backendRow.className = 'p-3 bg-gray-50 border rounded mb-4';
-    backendRow.innerHTML = '<div class="text-xs font-semibold mb-2 text-gray-600">Backend Configuration (Hybrid Execution)</div>';
-
-    backendRow.appendChild(H.inputRow({
-      label: 'Backend URL',
-      id: 'start_backend_url',
-      value: node.backend_url || 'http://localhost:8000',
-      placeholder: 'e.g. http://localhost:8000'
-    }));
-
-    backendRow.appendChild(H.inputRow({
-      label: 'API Key (Optional)',
-      id: 'start_api_key',
-      value: node.api_key || '',
-      placeholder: 'sk-...'
-    }));
-
-    // Bind changes
-    backendRow.querySelector('#start_backend_url input').addEventListener('change', e => node.backend_url = e.target.value);
-    backendRow.querySelector('#start_api_key input').addEventListener('change', e => node.api_key = e.target.value);
-
-    container.appendChild(backendRow);
 
     // Variables definitions
-    let vars = Array.isArray(node.variables) ? node.variables : [];
+    if (!Array.isArray(node.variables)) node.variables = [];
+    const vars = node.variables;
     const varLabel = vars.length === 0 ? 'Variables (ninguna definida, haz clic en "Añadir variable")' : 'Variables (definidas en start)';
     if (typeof H.variablesEditor === 'function') container.appendChild(H.variablesEditor({ label: varLabel, id: 'start_variables', variables: vars }));
     else container.appendChild(jsonEditor({ label: varLabel, id: 'start_variables', value: vars }));

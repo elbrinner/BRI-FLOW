@@ -1,19 +1,19 @@
-    // showToast ahora proviene de RendererHelpers.showToast
-  const showToast = window.RendererHelpers?.showToast || function(){};
+// showToast ahora proviene de RendererHelpers.showToast
+const showToast = window.RendererHelpers?.showToast || function () { };
 // form_renderers.js
 // Define los renderizadores por tipo y se apoyan en FormBuilderHelpers expuestos por formbuilder.js
-(function(){
+(function () {
   // Reusar helpers centralizados
   const { safe } = window.RendererHelpers || {};
-  safe(()=>console.debug('[FormRenderers] cargado'),'bootstrap');
+  safe(() => console.debug('[FormRenderers] cargado'), 'bootstrap');
   const H = window.FormBuilderHelpers || {};
   // getHostValue ya no se usa tras extracción de REST / Loop
 
   // small helpers to get functions from helpers safely
   // arrayRow no usado tras extracción de response
-  const jsonEditor = H.jsonEditor || function(){ return document.createElement('div'); };
+  const jsonEditor = H.jsonEditor || function () { return document.createElement('div'); };
   // fieldsEditor ya no se usa aquí tras modularización
-  const el = H.el || function(tag, attrs={}, children=[]){ const e=document.createElement(tag); (children||[]).forEach(c=>e.appendChild(c)); return e; };
+  const el = H.el || function (tag, attrs = {}, children = []) { const e = document.createElement(tag); (children || []).forEach(c => e.appendChild(c)); return e; };
 
   // renderValidation centralizado en módulos específicos
 
@@ -30,43 +30,49 @@
 
 
   // Alias de tipos (normalización)
-  const aliasMap = { 'rest-call':'rest_call', 'restcall':'rest_call' };
+  const aliasMap = { 'rest-call': 'rest_call', 'restcall': 'rest_call' };
 
-  function getRenderer(type){
+  function getRenderer(type) {
     const t = aliasMap[type] || type;
     // Buscar primero en registro modular
-    if(window.RendererRegistry?.[t]) {
+    if (window.RendererRegistry?.[t]) {
       return window.RendererRegistry[t];
     }
     // Casos especiales inline
-    if(t==='hidden_response') return window.RendererRegistry?.hidden_response || null;
+    if (t === 'hidden_response') return window.RendererRegistry?.hidden_response || null;
     return null; // fallback permitirá JSON libre
   }
 
   const FormRenderers = {
-    renderFor: function(node, container, nodeIds = []) {
-  container.innerHTML = '';
-      if(!H) {
-        container.appendChild(el('div',{},[document.createTextNode('Form builders helpers no disponibles')]));
+    renderFor: function (node, container, nodeIds = []) {
+      container.innerHTML = '';
+      if (!H) {
+        container.appendChild(el('div', {}, [document.createTextNode('Form builders helpers no disponibles')]));
         return;
       }
       // Normalize node type to avoid small mismatches (rest_call vs rest-call etc.)
-  const lookupType = (node.type||'').toString().trim();
-  const fn = getRenderer(lookupType);
-      if(fn) {
-        const ok = safe(()=>{ fn(node, container, nodeIds); return true; },'renderer:'+lookupType);
-        if(!ok) container.appendChild(el('div',{class:'form-row text-red-600'},[document.createTextNode('Error renderizando propiedades')]));
-        safe(()=>console.debug('[FormRenderers] renderFor: renderizado de', node.type),'renderFor-debug');
-        safe(()=>{ if (typeof renderGlobalVars === 'function') renderGlobalVars(container); },'renderGlobalVars-post');
+      const lookupType = (node.type || '').toString().trim();
+      const fn = getRenderer(lookupType);
+      if (fn) {
+        try {
+          fn(node, container, nodeIds);
+          safe(() => console.debug('[FormRenderers] renderFor: renderizado de', node.type), 'renderFor-debug');
+          safe(() => { if (typeof renderGlobalVars === 'function') renderGlobalVars(container); }, 'renderGlobalVars-post');
+        } catch (e) {
+          console.error('[FormRenderers] Error rendering props for:', node.type, e);
+          container.appendChild(el('div', { class: 'form-row text-red-600' }, [document.createTextNode('Error: ' + e.message)]));
+          // Fallback to JSON editor so user is not stuck
+          container.appendChild(jsonEditor({ label: 'Props (Fallback JSON)', id: 'props_raw', value: node.props || node.properties || {} }));
+        }
       } else {
         // fallback: show raw props or properties (imported flows may use 'properties')
-        container.appendChild(jsonEditor({label:'Props (JSON libre)', id:'props_raw', value: node.props || node.properties || {}}));
+        container.appendChild(jsonEditor({ label: 'Props (JSON libre)', id: 'props_raw', value: node.props || node.properties || {} }));
       }
       // Agregar campo descripcion común a todos los nodos
       const descRow = el('div', { class: 'form-row' });
       descRow.appendChild(el('label', { text: 'Documentación, solo para referencia interna (opcional)' }));
-  const descTa = el('textarea', { id: 'node_descripcion', placeholder: 'Describe el propósito de este nodo...' });
-  try { descTa.value = node.descripcion || ''; } catch(e) { descTa.value = ''; }
+      const descTa = el('textarea', { id: 'node_descripcion', placeholder: 'Describe el propósito de este nodo...' });
+      try { descTa.value = node.descripcion || ''; } catch (e) { descTa.value = ''; }
       descTa.maxLength = 500;
       descTa.rows = 2;
       descRow.appendChild(descTa);
