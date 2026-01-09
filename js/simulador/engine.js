@@ -208,7 +208,8 @@
                 api: window.Simulador.api,
                 useRealHttp: Engine.useRealHttp,
                 fastMode: Engine.fastMode,
-                stepDelay: Engine.stepDelay
+                stepDelay: Engine.stepDelay,
+                returnFromFlow: Engine.returnFromFlow
             });
         } else {
             ui.log('No node processor found for type: ' + node.type);
@@ -226,13 +227,85 @@
         }
     };
 
-    Engine.handleEphemerals = function (state, ui) {
-        // Logic to parse inputs from UI and inject into state.variables
-        // And logic to clear them after step (TTL)
-        // This logic was complex in simulador.js (lines 1103-1154).
-        // We should probably move it to State or keep it here as "Pre-step logic".
-        // For brevity, I'll assume we can implement a simplified version or copy it.
+    Engine.resumeWithInput = function (text) {
+        const state = window.Simulador.state.data;
+        const ui = window.Simulador.ui;
 
+        if (!state || !state._waitingForInput) {
+            ui.log('⚠️ Input received but not waiting for input.');
+            return;
+            // Optionally, we could still treat it as a global intent trigger?
+        }
+
+        const nodeId = state._inputNodeId;
+        const flow = window.Simulador.flow.currentFlow;
+        const node = flow._nodes[nodeId];
+
+        if (!node) {
+            ui.log('❌ Error resuming: idle node not found.');
+            return;
+        }
+
+        ui.log(`▶️ Resuming from INPUT (${nodeId}) with "${text}"`);
+
+        // Save Input Variable
+        const saveKey = node.save_as || node.variable || `input_${nodeId}`;
+        state.variables[saveKey] = text;
+
+        // Clear waiting flag
+        delete state._waitingForInput;
+        delete state._inputNodeId;
+
+        // Move to next
+        const ctx = {
+            gotoNext: window.Simulador.flow.gotoNext,
+            scheduleStep: Engine.scheduleStep
+        };
+        state.current = ctx.gotoNext(node.next);
+
+        // Resume
+        Engine.running = true;
+        Engine.step();
+    };
+
+    Engine.returnFromFlow = function () {
+        const state = window.Simulador.state.data;
+        const ui = window.Simulador.ui;
+
+        if (!state.callStack || state.callStack.length === 0) {
+            ui.log('END reached (Root Flow). Finishing.');
+            return false; // No stack, stop
+        }
+
+        const returnPoint = state.callStack.pop();
+        ui.log(`🔙 Returning from sub-flow to ${returnPoint.flowId} (node ${returnPoint.returnToNodeId})`);
+
+        // Restore Flow
+        // We need to find the flow object. 
+        const projectFlows = window.AppProject ? window.AppProject.flows : {};
+        const targetFlow = projectFlows[returnPoint.flowId];
+
+        if (!targetFlow) {
+            ui.log(`❌ Error returning: Flow ${returnPoint.flowId} not found.`);
+            return false;
+        }
+
+        window.Simulador.flow.currentFlow = targetFlow;
+        state.current = returnPoint.returnToNodeId;
+
+        // Restore context variables? 
+        // Usually local variables are scoped? 
+        // BriFlow usually shares global state variables. 
+        // If we want scoped variables, we would restore them here from the stack frame.
+        // For now, assuming Global Variables (shared).
+
+        Engine.running = true;
+        Engine.scheduleStep();
+        return true;
+    };
+
+    Engine.handleEphemerals = function (state, ui) {
+        // ... (previous logic)
         const extra = ui.parseSimExtraInput();
         if (extra !== undefined) state.variables.extra = extra;
 
@@ -241,11 +314,6 @@
 
         const origin = ui.parseSimOriginInput();
         if (origin !== undefined) { state.variables.origin = origin; state.variables.$origin = origin; }
-
-        // Cleanup logic is tricky because it needs to run AFTER the node processing, 
-        // but node processing might be async (rest_call, input).
-        // In the original code, `__clearEphemerals` was passed to node handlers.
-        // We should probably pass a cleanup callback to `processNode`.
     };
 
     window.Simulador.engine = Engine;

@@ -4,6 +4,7 @@
   console.log('[Simulador] Bootstrapping modular simulator...');
 
   const scripts = [
+    'js/simulador-core.js',
     'js/simulador/utils.js',
     'js/simulador/state.js',
     'js/simulador/i18n.js',
@@ -13,8 +14,10 @@
     'js/simulador/engine.js',
     'js/simulador/nodes/index.js',
     'js/simulador/nodes/logic.js',
+    'js/simulador/nodes/response.js',
     'js/simulador/nodes/interaction.js',
     'js/simulador/nodes/form.js',
+    'js/simulador/nodes/input.js',
     'js/simulador/nodes/service.js',
     'js/simulador/index.js'
   ];

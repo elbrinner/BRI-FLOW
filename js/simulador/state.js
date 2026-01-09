@@ -14,6 +14,7 @@
         State.data = {
             variables: {},
             history: [],
+            callStack: [], // Stack for flow jumps: [{ flowId, nodeId, returnToNodeId }]
             current: flow ? (flow._start || flow.start_node) : null,
             steps: 0,
             selections: { button: {}, choice: {} }

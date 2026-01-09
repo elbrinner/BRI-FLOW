@@ -172,9 +172,12 @@
 
     // Synthetic Loop Return: Auto-detect end of loop body and draw specific return line
     try {
+      const leafCandidates = {}; // map: leafId -> { loopId, dist }
+
       for (const id in state.nodes) {
         const loopNode = state.nodes[id];
-        if (!loopNode || (loopNode.type !== 'foreach' && loopNode.type !== 'loop' && loopNode.type !== 'while')) continue;
+        const type = (loopNode.type || '').toLowerCase();
+        if (!loopNode || (type !== 'foreach' && type !== 'loop' && type !== 'while')) continue;
 
         const bodyStartRef = loopNode.body_start || loopNode.loop_body;
         const bodyStartId = resolveTargetRef(bodyStartRef, currentFlowId);
@@ -184,10 +187,13 @@
         // Scoped PER LOOP so each loop identifies its own returns independently.
         const leaves = new Set();
         const visited = new Set();
-        const queue = [bodyStartId];
+        const queue = [{ id: bodyStartId, dist: 1 }];
 
         while (queue.length > 0) {
-          const currId = queue.shift();
+          const item = queue.shift();
+          const currId = item.id;
+          const dist = item.dist;
+
           if (visited.has(currId)) continue;
           visited.add(currId);
 
@@ -203,28 +209,34 @@
             if (t) {
               hasChildren = true;
               // Only traverse if not visited to avoid cycles
-              if (!visited.has(t)) queue.push(t);
+              if (!visited.has(t)) queue.push({ id: t, dist: dist + 1 });
             }
           };
 
+          const currType = (currNode.type || '').toLowerCase();
+
           // Branching logic based on node type
-          if (currNode.type === 'condition') {
+          if (currType === 'condition') {
             check(currNode.true_target);
             check(currNode.false_target);
-          } else if (currNode.type === 'choice') {
+          } else if (currType === 'choice') {
             if (Array.isArray(currNode.cases)) {
               currNode.cases.forEach(c => check(c.target));
             }
             if (currNode.default_target) check(currNode.default_target);
             check(currNode.next);
-          } else if (currNode.type === 'flow_jump') {
+          } else if (currType === 'flow_jump') {
             hasChildren = true; // Exits flow
+            if (currNode.return_target) check(currNode.return_target);
+          } else if (currType === 'foreach' || currType === 'loop' || currType === 'while') {
+            // CRITICAL FIX: Treat nested loops as black boxes.
+            // Do NOT enter body_start/loop_body. Only follow exit paths (next).
+            check(currNode.next);
           } else {
             // Standard & Generic connections
             check(currNode.next);
 
             // CRITICAL FIX: Check generic 'connections' array (used by some generic nodes)
-            // This prevents false positive "leaves" in the middle of a flow.
             if (Array.isArray(currNode.connections)) {
               currNode.connections.forEach(c => check(c));
             }
@@ -236,14 +248,21 @@
           }
 
           if (!hasChildren) {
-            leaves.add(currId);
+            // It's a leaf for THIS loop
+            // Store in candidates, preferring shorter distance (closest loop)
+            if (!leafCandidates[currId] || dist < leafCandidates[currId].dist) {
+              leafCandidates[currId] = { loopId: id, dist: dist };
+            }
           }
         }
-
-        for (const leafId of leaves) {
-          pushSpec(leafId, id, null, { isLoopReturn: true });
-        }
       }
+
+      // Finally, create connections for the winning candidates
+      Object.keys(leafCandidates).forEach(leafId => {
+        const winner = leafCandidates[leafId];
+        pushSpec(leafId, winner.loopId, null, { isLoopReturn: true });
+      });
+
     } catch (e) {
       console.warn('[AppConnections] Error in synthetic loop traversal', e);
     }

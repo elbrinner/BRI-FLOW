@@ -1,4 +1,3 @@
-// js/simulador/nodes/form.js
 (function () {
     'use strict';
 
@@ -7,63 +6,223 @@
     };
 
     register('form', (node, state, flow, nodeId, ctx) => {
-        // Simplified form handler
         ctx.log(`FORM (${nodeId}) - Rendering form...`);
 
-        // In a real refactor, we would extract the full form rendering logic from simulador.js
-        // For now, we'll just log and skip to next to avoid breaking if logic is missing
-        // OR we can try to use the existing window.Simulador.nodes.processForm if it was preserved in simulador-nodes.js
-        // But we are replacing simulador.js...
+        // 1. Build Fields
+        let fields = Array.isArray(node.fields) ? node.fields : [];
+        const mode = node.mode || 'static';
+        const srcKey = node.fields_source || node.FieldsSource || (node.provider && node.provider.source_list);
 
-        // Let's assume we need to implement a basic version or delegate to a legacy helper if we kept it.
-        // Since I didn't copy the huge form logic, I'll put a placeholder.
+        if (mode === 'dynamic' && srcKey) {
+            try {
+                // Try to get variable from state
+                let payload = state.variables[srcKey];
+                // Fallback to flow default variable if not in state? (Simulator usually relies on runtime state)
 
-        const panel = document.getElementById('simulatorCanvasPreview');
-        if (panel) {
-            panel.innerHTML = '<div class="p-4 border rounded bg-gray-50">Formulario (Placeholder refactorizado)</div>';
-            const btn = document.createElement('button');
-            btn.className = 'mt-2 px-4 py-2 bg-blue-600 text-white rounded';
-            btn.textContent = 'Enviar (Simulado)';
-            btn.onclick = () => {
-                ctx.log('Formulario enviado');
-                state.current = ctx.gotoNext(node.next);
-                ctx.scheduleStep();
-            };
-            panel.appendChild(btn);
+                const arr = Array.isArray(payload) ? payload : (payload && payload.items ? payload.items : (payload ? [payload] : []));
+
+                // Helper to normalize
+                const toTextType = (ft) => {
+                    const s = String(ft || '').toUpperCase();
+                    if (['LONG', 'TEXTAREA', 'MULTILINE'].includes(s)) return 'textarea';
+                    if (['SHORT', 'TEXT', 'STRING'].includes(s)) return 'text';
+                    if (['PASSWORD'].includes(s)) return 'password';
+                    if (['NUMBER', 'INT', 'FLOAT', 'DECIMAL'].includes(s)) return 'number';
+                    if (['EMAIL'].includes(s)) return 'email';
+                    if (['DATE', 'DATETIME'].includes(s)) return 'date';
+                    if (['SELECT', 'DROPDOWN', 'CHOICE'].includes(s)) return 'select';
+                    if (['CHECKBOX', 'BOOLEAN', 'TOGGLE'].includes(s)) return 'checkbox';
+                    if (['RADIO'].includes(s)) return 'radio';
+                    return 'text';
+                };
+
+                const normalizeOptions = (opts) => {
+                    if (!opts) return undefined;
+                    let raw = opts;
+                    if (!Array.isArray(raw)) raw = raw.options || raw.items || raw.choices || raw.values || [];
+                    if (!Array.isArray(raw)) return undefined;
+                    return raw.map(o => {
+                        const lbl = o.label ?? o.text ?? o.title ?? o.name ?? o.key ?? o.id ?? String(o);
+                        const val = o.value ?? o.id ?? o.key ?? lbl;
+                        return { label: lbl, value: val };
+                    });
+                };
+
+                const built = [];
+                arr.forEach(item => {
+                    try {
+                        const base = (item && typeof item === 'object') ? item : { Name: String(item || '') };
+                        const d = base.field || base;
+                        const name = d.Name || d.name || d.FieldName || d.nameprop || d.key || d.code || d.id || d.var || '';
+                        if (!name) return;
+
+                        let label = d.Prompt || d.prompt || d.Label || d.label || d.title || d.text || d.desc || name;
+                        if (typeof label === 'object') label = label.es || label[Object.keys(label)[0]];
+
+                        const type = toTextType(d.FieldType || d.fieldType || d.type);
+                        const placeholder = d.Placeholder || d.placeholder || '';
+                        const options = normalizeOptions(d.options || d.Options || d.choices || d.items || d.values);
+                        const required = !!(d.required || d.Required || d.isRequired || d.mandatory);
+                        const rows = d.rows || d.Rows;
+                        const value = d.default ?? d.value ?? d.initial;
+
+                        built.push({ name, label, type, placeholder, options, required, rows, value });
+                    } catch (e) { ctx.log('Error building field: ' + e.message); }
+                });
+                if (built.length) fields = built;
+            } catch (e) {
+                ctx.log('Error processing dynamic fields: ' + e.message);
+            }
         }
-        ctx.stop();
-    });
 
-    register('input', (node, state, flow, nodeId, ctx) => {
-        // Simplified input handler
-        const panel = document.getElementById('simulatorCanvasPreview');
-        if (panel) {
-            panel.innerHTML = '';
-            const title = document.createElement('div');
-            title.className = 'font-semibold mb-2';
-            title.textContent = ctx.getI18nPrompt(node, 'Introduce un valor');
-            panel.appendChild(title);
+        // 2. Render Form UI
+        const formWrap = document.createElement('div');
+        const formTitle = document.createElement('div');
+        formTitle.className = 'font-semibold mb-2';
+        formTitle.textContent = ctx.getI18nPrompt(node, 'Completa el formulario');
 
-            const input = document.createElement('input');
-            input.className = 'border p-2 w-full rounded';
-            input.placeholder = 'Escribe aquí...';
-            panel.appendChild(input);
+        const form = document.createElement('form');
+        form.className = 'mt-1 space-y-3';
+        const requiredFields = new Set();
 
-            const btn = document.createElement('button');
-            btn.className = 'mt-2 px-4 py-2 bg-blue-600 text-white rounded';
-            btn.textContent = 'Enviar';
-            btn.onclick = () => {
-                const val = input.value;
-                const saveKey = node.save_as || node.variable || `input_${nodeId}`;
-                state.variables[saveKey] = val;
-                ctx.log(`INPUT received: ${val}`);
-                state.current = ctx.gotoNext(node.next);
-                ctx.renderPreview();
-                ctx.renderVariables();
-                ctx.scheduleStep();
-            };
-            panel.appendChild(btn);
-        }
-        ctx.stop();
+        fields.forEach((field, idx) => {
+            const fieldDiv = document.createElement('div');
+            const label = document.createElement('label');
+            label.className = 'block text-sm font-medium text-gray-700';
+            label.textContent = ctx.getI18nPrompt(field, field.label || `Campo ${idx + 1}`);
+            fieldDiv.appendChild(label);
+
+            let input;
+            const fieldType = field.type || 'text';
+
+            if (fieldType === 'textarea') {
+                input = document.createElement('textarea');
+                input.className = 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm';
+                input.rows = field.rows || 3;
+            } else if (fieldType === 'select') {
+                input = document.createElement('select');
+                input.className = 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm bg-white';
+                const options = Array.isArray(field.options) ? field.options : [];
+                options.forEach((opt) => {
+                    const optEl = document.createElement('option');
+                    optEl.value = opt.value !== undefined ? opt.value : opt.label;
+                    optEl.textContent = opt.label || opt.value;
+                    input.appendChild(optEl);
+                });
+            } else if (fieldType === 'checkbox') {
+                input = document.createElement('input');
+                input.type = 'checkbox';
+                input.className = 'mt-1';
+                const preVal = state.variables[field.name];
+                if (preVal === true || preVal === 'true') input.checked = true;
+            } else {
+                input = document.createElement('input');
+                input.type = fieldType;
+                input.className = 'mt-1 block w-full border border-gray-300 rounded-md shadow-sm p-2 text-sm';
+                if (field.placeholder) input.placeholder = field.placeholder;
+            }
+
+            if (field.required) { requiredFields.add(field.name); input.required = true; }
+
+            if (field.name) {
+                input.name = field.name;
+                const preVal = state.variables[field.name];
+                // Init value
+                if (preVal !== undefined && preVal !== null && fieldType !== 'checkbox') {
+                    input.value = String(preVal);
+                } else if (field.value !== undefined && fieldType !== 'checkbox') {
+                    input.value = String(field.value);
+                }
+            }
+
+            fieldDiv.appendChild(input);
+            form.appendChild(fieldDiv);
+        });
+
+        // Actions
+        const actions = document.createElement('div');
+        actions.className = 'mt-3 flex gap-2';
+
+        const btnSubmit = document.createElement('button');
+        btnSubmit.type = 'submit';
+        btnSubmit.textContent = 'Enviar';
+        btnSubmit.className = 'px-4 py-2 bg-sky-600 text-white rounded text-sm hover:bg-sky-700';
+
+        const btnCancel = document.createElement('button');
+        btnCancel.type = 'button';
+        btnCancel.textContent = 'Cancelar';
+        btnCancel.className = 'px-4 py-2 bg-gray-200 text-gray-700 rounded text-sm hover:bg-gray-300';
+        btnCancel.onclick = () => {
+            state.current = ctx.gotoNext(node.next);
+            ctx.scheduleStep();
+        };
+
+        actions.appendChild(btnSubmit);
+        actions.appendChild(btnCancel);
+
+        formWrap.appendChild(formTitle);
+        formWrap.appendChild(form);
+        formWrap.appendChild(actions);
+
+        // Submit Logic
+        form.onsubmit = (e) => {
+            e.preventDefault();
+            const formData = new FormData(form);
+            const dataObj = {};
+
+            // Check required (simple check, browser handles most)
+            let valid = true;
+
+            // Populate data
+            // Handle checkboxes specifically because FormData might exclude unchecked? 
+            // Actually new FormData(form) includes checked checkboxes. Unchecked are missing.
+            // But we iterate fields.
+
+            fields.forEach(f => {
+                if (!f.name) return;
+                let val = formData.get(f.name);
+                if (f.type === 'checkbox') {
+                    // Checkbox value is 'on' if stored without value attr, or the value attr.
+                    // We want boolean usually or the value if part of set.
+                    // Here simple boolean field assumption.
+                    const el = form.querySelector(`[name="${f.name}"]`);
+                    val = el ? el.checked : false;
+                }
+                dataObj[f.name] = val;
+            });
+
+            // Iterate remaining FormData for non-defined fields (if any) or overwrite
+            for (let [k, v] of formData.entries()) {
+                if (dataObj[k] === undefined) dataObj[k] = v;
+            }
+
+            // Save to variables
+            const saveAs = node.save_as || `form_${nodeId}`;
+            state.variables[saveAs] = dataObj;
+
+            // Also flatten to root variables? Yes, standard behavior usually
+            Object.assign(state.variables, dataObj);
+
+            ctx.log(`FORM submitted: ${JSON.stringify(dataObj)}`);
+
+            // Chip
+            if (window.Simulador.nodes.createSavedChip) {
+                ctx.appendChatMessage('bot', window.Simulador.nodes.createSavedChip('form', Object.keys(dataObj).join(', ')));
+            }
+
+            state.history.push({ node: nodeId, type: 'form', data: dataObj });
+            state.current = ctx.gotoNext(node.next);
+            ctx.renderVariables();
+            ctx.scheduleStep();
+        };
+
+        // Render to Chat
+        const chatCard = document.createElement('div');
+        chatCard.className = 'bg-white border rounded p-3 max-w-[520px] shadow-sm flex flex-col gap-3';
+        chatCard.appendChild(formWrap);
+
+        ctx.appendChatMessage('bot', chatCard);
+
+        ctx.stop(); // Interaction pause
     });
 })();

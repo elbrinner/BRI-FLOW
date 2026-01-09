@@ -518,26 +518,29 @@
 
         // 2. Check for A2A Addressing (@agent)
         if (text.startsWith('@')) {
+            // ... (existing routing logic)
             const match = text.match(/^@(\w+)\s+(.+)$/);
             if (match) {
                 const targetAgent = match[1];
                 const content = match[2];
                 UI.log(`📧 Routing message to agent: ${targetAgent}`);
-
                 if (window.Simulador.engine && window.Simulador.engine.routeMessage) {
                     window.Simulador.engine.routeMessage(targetAgent, content);
-                } else {
-                    UI.log('⚠️ Engine does not support routing yet.');
                 }
                 return;
             }
         }
 
-        // 3. Default behavior (if waiting for input, or just log)
-        // If the engine is paused at an input node, we might want to feed this input to it.
-        // But processInput.js has its own input. 
-        // For now, we just log "Message received".
-        UI.log(`Message received: ${text}`);
+        // 3. Check if waiting for input
+        if (window.Simulador.state && window.Simulador.state.data && window.Simulador.state.data._waitingForInput) {
+            if (window.Simulador.engine && window.Simulador.engine.resumeWithInput) {
+                window.Simulador.engine.resumeWithInput(text);
+                return;
+            }
+        }
+
+        // 4. Default behavior (just log if not handled)
+        UI.log(`Message received: ${text} (Ignored by engine)`);
     };
 
     UI.initHandlers = function () {
