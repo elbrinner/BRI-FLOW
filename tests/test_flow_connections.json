@@ -1,0 +1,47 @@
+{
+    "schema_version": 2,
+    "flow_id": "form_test",
+    "version": "0.0.2",
+    "name": "Form Test",
+    "description": "",
+    "locales": [
+        "es"
+    ],
+    "start_node": "start",
+    "is_main": false,
+    "last_modified": "2025-12-12T21:54:46.003Z",
+    "nodes": {
+        "start": {
+            "id": "start",
+            "type": "start",
+            "x": 248.08362369338005,
+            "y": 157.5009655038656,
+            "next": {
+                "flow_id": "form_test",
+                "node_id": "f1"
+            },
+            "descripcion": "",
+            "variables": []
+        },
+        "f1": {
+            "id": "f1",
+            "type": "form",
+            "x": 657.839721254356,
+            "y": 228.58110487668796,
+            "next": {
+                "flow_id": "",
+                "node_id": "end"
+            },
+            "mode": "dynamic",
+            "fields_source": "ucSectionFields",
+            "fields": [],
+            "save_as": "uc_form_values"
+        },
+        "end": {
+            "id": "end",
+            "type": "end",
+            "x": 1102.439024390245,
+            "y": 267.60549512059043
+        }
+    }
+}

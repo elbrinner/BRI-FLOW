@@ -65,6 +65,7 @@
     if (modal && typeof modal.showModal==='function'){
       modal.showModal();
       setTimeout(bindCopyExprButtons, 50);
+      setTimeout(wireDocLoaders, 50);
       if (targetSelector) {
         // Scroll diferido a la sección indicada
         setTimeout(() => {
@@ -133,6 +134,55 @@
           console.warn('[HelpModal] No se pudo copiar', err);
         }
       });
+    }
+  }
+
+  function wireDocLoaders(){
+    if (!modal) return;
+    const btnExp = modal.querySelector('#helpLoadExpressions');
+    const btnNodes = modal.querySelector('#helpLoadNodes');
+
+    if (btnExp && !btnExp.dataset.wired){
+      btnExp.dataset.wired = '1';
+      btnExp.addEventListener('click', () => loadDocInto('docs/expresiones.md', 'helpExpressionsContent'));
+    }
+    if (btnNodes && !btnNodes.dataset.wired){
+      btnNodes.dataset.wired = '1';
+      btnNodes.addEventListener('click', () => loadDocInto('docs/nodo.md', 'helpNodesContent'));
+    }
+  }
+
+  async function loadDocInto(url, containerId){
+    try {
+      const container = modal?.querySelector('#' + containerId);
+      if (!container) return;
+
+      if (location.protocol === 'file:'){
+        container.innerHTML = '<div class="text-sm text-amber-700">No se puede cargar ' + url + ' desde <code>file://</code>. Inicia un servidor local.</div>';
+        return;
+      }
+
+      container.innerHTML = '<div class="text-sm text-gray-600">Cargando…</div>';
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 7000);
+      const res = await fetch(url, { cache: 'no-store', signal: controller.signal });
+      clearTimeout(timeoutId);
+      if (!res.ok) throw new Error('HTTP ' + res.status);
+      const text = await res.text();
+
+      const pre = document.createElement('pre');
+      pre.className = 'bg-gray-50 border rounded p-2 text-xs whitespace-pre-wrap';
+      pre.textContent = text;
+
+      container.innerHTML = '';
+      container.appendChild(pre);
+    } catch (err) {
+      console.warn('[HelpModal] No se pudo cargar doc', url, err);
+      try {
+        const container = modal?.querySelector('#' + containerId);
+        if (container) container.innerHTML = '<div class="text-sm text-red-700">No se pudo cargar ' + url + '.</div>';
+      } catch(_e) { /* noop */ }
     }
   }
 

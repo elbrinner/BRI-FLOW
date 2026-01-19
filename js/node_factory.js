@@ -1,15 +1,15 @@
 // node_factory.js
 // Centraliza la creación de nodos y genId
-(function(){
+(function () {
   let stateRef = null;
   let renderNode = null;
   let selectNode = null;
   let refreshOutput = null;
 
-  function initNodeByType(base, type, locales){
+  function initNodeByType(base, type, locales) {
     const t = type;
-    const ensureI18n = (obj, keys) => { obj.i18n = obj.i18n || {}; keys.forEach(l=>{ obj.i18n[l] = obj.i18n[l] || {}; }); };
-    switch (t){
+    const ensureI18n = (obj, keys) => { obj.i18n = obj.i18n || {}; keys.forEach(l => { obj.i18n[l] = obj.i18n[l] || {}; }); };
+    switch (t) {
       case 'start':
         // Nodo Start: ahora centraliza definición de locales del proyecto.
         base.variables = base.variables || [];
@@ -19,6 +19,8 @@
             ? stateRef.meta.locales : ['es'];
           base.locales = [...metaLocales];
         }
+        // Default debug enabled
+        if (base.enable_debug === undefined) base.enable_debug = true;
         break;
       case 'extra':
         // Nodo minimalista: solo usa next y descripcion; sin props especiales
@@ -78,7 +80,7 @@
       case 'loop': {
         base.mode = base.mode || 'foreach'; // foreach | while
         base.source_list = base.source_list || '';
-        if (base.mode === 'while'){
+        if (base.mode === 'while') {
           base.item_var = base.item_var || 'i';
           base.index_var = base.index_var || '';
           base.cond = base.cond || 'i < 10';
@@ -108,6 +110,9 @@
       case 'json_export':
         base.filename = 'export.json'; base.description = ''; base.template = {};
         break;
+      case 'file_download':
+        base.file_url = ''; base.filename = ''; base.description = '';
+        break;
       case 'condition':
         base.expr = base.expr || '';
         base.true_target = base.true_target || null;
@@ -123,23 +128,37 @@
       case 'set_goto':
         base.target = base.target || '';
         break;
+      case 'event_start':
+        base.event_type = base.event_type || 'webhook';
+        base.filter_expr = base.filter_expr || '';
+        break;
+      case 'human_validation':
+        base.timeout = base.timeout || 3600; // 1 hour default
+        base.approvers = base.approvers || []; // list of roles/users
+        base.on_timeout = base.on_timeout || null;
+        break;
+      case 'coordinator':
+        base.strategy = 'fan_out'; // fan_out, round_robin, sequential
+        base.sub_agents = [];
+        base.aggregation = 'concat'; // concat, summarize
+        break;
     }
   }
 
-  function init(opts){
+  function init(opts) {
     stateRef = opts.state || stateRef;
     renderNode = opts.renderNode || renderNode;
     selectNode = opts.selectNode || selectNode;
     refreshOutput = opts.refreshOutput || refreshOutput;
   }
 
-  function genId(type){
+  function genId(type) {
     let n = 1;
     while (stateRef?.nodes?.[`${type}_${n}`]) n++;
     return `${type}_${n}`;
   }
 
-  function createNode(type, x=20, y=20){
+  function createNode(type, x = 20, y = 20) {
     if (!stateRef) throw new Error('node_factory: state not initialized');
     // Unicidad de Start: si ya existe uno en meta, seleccionar
     if (type === 'start') {
@@ -150,12 +169,12 @@
       }
     }
     // Keep the actual type (foreach/while) so form renderer can pick a specialized panel.
-  const actualType = (type === 'choice_switch') ? 'choice' : type;
-  const id = genId(actualType);
-  const base = { id, type: actualType, x, y, next: null, descripcion: '' };
-    if(type === 'start'){
+    const actualType = (type === 'choice_switch') ? 'choice' : type;
+    const id = genId(actualType);
+    const base = { id, type: actualType, x, y, next: null, descripcion: '' };
+    if (type === 'start') {
       const prev = stateRef.meta.start_node;
-      if(prev && stateRef.nodes[prev]){
+      if (prev && stateRef.nodes[prev]) {
         stateRef.nodes[prev].type = 'response';
         renderNode?.(stateRef.nodes[prev]);
       }
@@ -183,8 +202,8 @@
     renderNode?.(base);
     selectNode?.(id);
     // link start node next to first created node if start exists and has no next
-    function linkStartIfNeeded(newId){
-      try{
+    function linkStartIfNeeded(newId) {
+      try {
         if (type === 'start') return;
         const startId = stateRef?.meta?.start_node;
         if (!startId) return;
@@ -194,7 +213,7 @@
           startNode.next = { flow_id: '', node_id: newId };
           renderNode?.(startNode);
         }
-  }catch(err){ console.warn('[node_factory] linkStartIfNeeded failed', err); }
+      } catch (err) { console.warn('[node_factory] linkStartIfNeeded failed', err); }
     }
     linkStartIfNeeded(id);
     refreshOutput?.();

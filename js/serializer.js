@@ -1,6 +1,6 @@
 // serializer.js
 // Encapsula la serialización del estado a JSON exportable
-(function(){
+(function () {
   function _getLabelFromOption(o) {
     if (o.label) return o.label;
     if (o.i18n && typeof o.i18n === 'object') {
@@ -23,7 +23,7 @@
     return null;
   }
 
-  function normalizeNode(n){
+  function normalizeNode(n) {
     const node = { id: n.id, type: n.type };
     // preserve canvas position so exported JSON can restore layout
     if (n.x !== undefined) node.x = n.x;
@@ -59,7 +59,6 @@
       dest.item_var = src.item_var || src.itemVar || 'item';
       dest.index_var = src.index_var || 'index';
       dest.body_start = src.body_start || null;
-      dest.after_loop = src.after_loop || null;
       if (dest.mode === 'while') dest.cond = src.cond || src.condition || '';
       else dest.cond = src.cond || '';
       if (Array.isArray(src.variables)) dest.variables = JSON.parse(JSON.stringify(src.variables));
@@ -144,6 +143,7 @@
             return { name: v.name || '', defaultValue: def, isList };
           });
         }
+        if (n.enable_debug !== undefined) node.enable_debug = !!n.enable_debug;
         break;
       case 'rest_call':
         _normalizeRestCall(n, node);
@@ -196,8 +196,15 @@
         if (n.loop_body) node.loop_body = JSON.parse(JSON.stringify(n.loop_body));
         if (n.body_start) node.body_start = JSON.parse(JSON.stringify(n.body_start));
         break;
+      case 'event_start':
+        copy('event_type'); copy('filter_expr');
+        break;
+      case 'human_validation':
+        copy('timeout'); copy('approvers');
+        if (n.on_timeout) node.on_timeout = JSON.parse(JSON.stringify(n.on_timeout));
+        break;
       default:
-        Object.keys(n).forEach(k => { if (!['id','type','x','y'].includes(k) && typeof n[k] !== 'function') node[k] = JSON.parse(JSON.stringify(n[k])); });
+        Object.keys(n).forEach(k => { if (!['id', 'type', 'x', 'y'].includes(k) && typeof n[k] !== 'function') node[k] = JSON.parse(JSON.stringify(n[k])); });
     }
     return node;
   }
@@ -265,21 +272,22 @@
       if (nd.body_start) nd.body_start = fixTarget(nd.body_start);
       if (nd.after_loop) nd.after_loop = fixTarget(nd.after_loop);
       if (nd.loop_body) nd.loop_body = fixTarget(nd.loop_body);
+      if (nd.on_timeout) nd.on_timeout = fixTarget(nd.on_timeout);
     }
   }
 
-  function generateFlowJson(state){
+  function generateFlowJson(state) {
     const nodesObj = {};
     for (const id in state.nodes) nodesObj[id] = normalizeNode(state.nodes[id]);
     normalizeAllTargets(nodesObj);
     // Quitar nodos solo-simulador (no deben persistir secretos ni perfiles)
-    const SIM_ONLY = new Set(['credential_profile','use_profile']);
+    const SIM_ONLY = new Set(['credential_profile', 'use_profile']);
     // Reencaminar "next" que apunten a nodos sim-only (passthrough)
-    function skipSimOnlyTarget(t){
+    function skipSimOnlyTarget(t) {
       let current = t;
       const guard = new Set();
-      while(current && current.node_id && nodesObj[current.node_id] && SIM_ONLY.has(nodesObj[current.node_id].type)){
-        if(guard.has(current.node_id)) break; // evitar bucles raros
+      while (current && current.node_id && nodesObj[current.node_id] && SIM_ONLY.has(nodesObj[current.node_id].type)) {
+        if (guard.has(current.node_id)) break; // evitar bucles raros
         guard.add(current.node_id);
         const nextOfSim = nodesObj[current.node_id].next || null;
         current = nextOfSim || null;
@@ -288,18 +296,19 @@
     }
     Object.keys(nodesObj).forEach(id => {
       const n = nodesObj[id];
-      if(n.next) n.next = skipSimOnlyTarget(n.next);
-      if(n.true_target) n.true_target = skipSimOnlyTarget(n.true_target);
-      if(n.false_target) n.false_target = skipSimOnlyTarget(n.false_target);
-      if(n.body_start) n.body_start = skipSimOnlyTarget(n.body_start);
-      if(n.after_loop) n.after_loop = skipSimOnlyTarget(n.after_loop);
-      if(n.loop_body) n.loop_body = skipSimOnlyTarget(n.loop_body);
-      if(Array.isArray(n.options)){
-        n.options = n.options.map(o => ({...o, target: skipSimOnlyTarget(o.target||o.next||null) }));
+      if (n.next) n.next = skipSimOnlyTarget(n.next);
+      if (n.true_target) n.true_target = skipSimOnlyTarget(n.true_target);
+      if (n.false_target) n.false_target = skipSimOnlyTarget(n.false_target);
+      if (n.body_start) n.body_start = skipSimOnlyTarget(n.body_start);
+      if (n.after_loop) n.after_loop = skipSimOnlyTarget(n.after_loop);
+      if (n.loop_body) n.loop_body = skipSimOnlyTarget(n.loop_body);
+      if (n.on_timeout) n.on_timeout = skipSimOnlyTarget(n.on_timeout);
+      if (Array.isArray(n.options)) {
+        n.options = n.options.map(o => ({ ...o, target: skipSimOnlyTarget(o.target || o.next || null) }));
       }
-      if(n.cases && Array.isArray(n.cases)){
-        n.cases = n.cases.map(c => ({ when: c.when || '', target: skipSimOnlyTarget(c.target||null) }));
-        if(n.default_target) n.default_target = skipSimOnlyTarget(n.default_target);
+      if (n.cases && Array.isArray(n.cases)) {
+        n.cases = n.cases.map(c => ({ when: c.when || '', target: skipSimOnlyTarget(c.target || null) }));
+        if (n.default_target) n.default_target = skipSimOnlyTarget(n.default_target);
       }
     });
     // Eliminar los nodos sim-only del export
@@ -308,15 +317,15 @@
     const bumpVersion = (v) => {
       if (!v || typeof v !== 'string') return '0.1.0';
       if (/^\d+$/.test(v)) return String(parseInt(v, 10) + 1);
-  const semverRe = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/;
-  const m = semverRe.exec(v);
+      const semverRe = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/;
+      const m = semverRe.exec(v);
       if (m) return `${m[1]}.${m[2]}.${parseInt(m[3], 10) + 1}`;
       return '0.1.0';
     };
     const meta = { ...(state.meta || {}) };
     meta.version = bumpVersion(meta.version);
     meta.last_modified = new Date().toISOString();
-  const out = { schema_version: 2, ...meta, nodes: nodesObj };
+    const out = { schema_version: 2, ...meta, nodes: nodesObj };
     if (out.start_node && !nodesObj[out.start_node]) out.start_node = '';
     return out;
   }

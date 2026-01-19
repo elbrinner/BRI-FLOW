@@ -7,7 +7,7 @@ Full license text: https://mariadb.com/bsl11/
 Parameters
 - Licensor: Elbriner da Silva Fernandes (Autores de BRI-FLOW)
 - Licensed Work: BRI-FLOW (este repositorio)
-- Additional Use Grant: Se permite el uso, modificación y ejecución del código para fines no productivos (evaluación, desarrollo interno, pruebas), así como la contribución mediante Pull Requests a este repositorio. No se permite ofrecer el software como un servicio, usarlo en producción, ni crear o distribuir productos derivados basados en este código sin un acuerdo comercial con el Licenciante.
+- Additional Use Grant: Se permite el uso, modificación y ejecución del código para fines no productivos (evaluación, desarrollo interno, pruebas), así como la contribución mediante Pull Requests a este repositorio. No se permite ofrecer el software como un servicio, ni crear o distribuir productos derivados basados en este código sin un acuerdo comercial con el Licenciante.
 - Change Date: 2029-10-22
 - Change License: MIT
 

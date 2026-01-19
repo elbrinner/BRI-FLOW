@@ -84,7 +84,7 @@ BRI-FLOW incluye **25+ tipos de nodos** organizados en categorías:
 - **`credential_profile`** - Define credenciales para simulación (no se exporta)
 - **`use_profile`** - Activa perfil de credenciales en simulador
 
-> 📖 **Documentación completa**: Cada nodo está documentado en detalle en [docs/nodo.md](docs/nodo.md) con propiedades, ejemplos y casos de uso.
+> 📖 **Documentación completa**: Nodos en [docs/nodo.md](docs/nodo.md) · Expresiones/funciones en [docs/expresiones.md](docs/expresiones.md).
 
 ## Estado del proyecto y alcance
 - Este editor está orientado a diseño de flujos y prototipado.
@@ -137,6 +137,8 @@ BRI-FLOW incluye **25+ tipos de nodos** organizados en categorías:
 ## Documentación de nodos
 
 📖 **Documentación completa y detallada**: [docs/nodo.md](docs/nodo.md)
+
+📖 **Referencia canónica de expresiones/funciones**: [docs/expresiones.md](docs/expresiones.md)
 
 Cada tipo de nodo, sus campos y comportamiento están descritos en:
 

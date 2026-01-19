@@ -1,0 +1,188 @@
+<!-- AI Copilot Modal -->
+<div id="copilotModal"
+  class="fixed inset-0 z-[400] hidden items-center justify-center bg-black bg-opacity-20 backdrop-blur-[1px]"
+  aria-hidden="true">
+  <div
+    class="bg-white rounded-xl shadow-2xl w-full max-w-lg flex flex-col overflow-hidden transform transition-all scale-100"
+    style="height: 600px; max-height: 90vh;">
+
+    <!-- Header -->
+    <div
+      class="bg-gradient-to-r from-indigo-600 to-purple-600 px-4 py-3 flex justify-between items-center shadow-md shrink-0">
+      <h3 class="text-lg font-bold text-white flex items-center gap-2">
+        <span>✨</span> AI Copilot
+      </h3>
+      <div class="flex items-center gap-2">
+        <button id="copilotBtnSettings" class="text-white/80 hover:text-white transition-colors" title="Configuración">
+          <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+          </svg>
+        </button>
+        <button id="copilotModalClose" class="text-white/80 hover:text-white transition-colors">✕</button>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="flex border-b bg-gray-50/50 shrink-0">
+      <button id="tabGen"
+        class="flex-1 py-3 text-sm font-semibold text-indigo-600 border-b-2 border-indigo-600 focus:outline-none transition-colors">
+        Generador de Flujos
+      </button>
+      <button id="tabChat"
+        class="flex-1 py-3 text-sm font-medium text-gray-500 hover:text-indigo-600 focus:outline-none transition-colors">
+        Pregunta al Experto
+      </button>
+    </div>
+
+    <!-- Content Area -->
+    <div class="flex-1 relative overflow-hidden bg-gray-50">
+
+      <!-- Generator Tab -->
+      <div id="panelGen" class="absolute inset-0 p-5 flex flex-col">
+        <label class="block text-sm font-medium text-gray-700 mb-2">Describe lo que necesitas:</label>
+        <textarea id="copilotPrompt"
+          class="w-full flex-1 p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent resize-none text-sm shadow-sm transition-shadow"
+          placeholder="Ej: Crea un flujo para agendar citas médicas pidiendo nombre, fecha y confirmación..."></textarea>
+
+        <div id="copilotError" class="hidden p-3 bg-red-50 text-red-700 text-sm rounded-lg border border-red-100">
+        </div>
+
+        <div id="copilotFileList" class="text-xs text-gray-500 mb-2 hidden">
+          Archivos adjuntos: <span id="copilotIncludedFiles" class="font-medium"></span>
+        </div>
+
+        <div class="mt-auto pt-4 border-t flex justify-end gap-3">
+          <input type="file" id="copilotFileInput" multiple class="hidden" />
+          <button id="copilotBtnAttach"
+            class="px-3 py-2 bg-white border border-gray-300 rounded-lg text-gray-600 hover:text-indigo-600 hover:bg-gray-50 transition-colors"
+            title="Adjuntar archivos para contexto">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+          </button>
+          <button id="copilotBtnCancel"
+            class="px-4 py-2 bg-white border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 font-medium text-sm transition-colors">Cancelar</button>
+          <button id="copilotBtnGenerate"
+            class="px-4 py-2 bg-gradient-to-r from-indigo-600 to-purple-600 text-white rounded-lg hover:from-indigo-700 hover:to-purple-700 font-medium text-sm shadow-md transition-all flex items-center gap-2">
+            <span>Generar Flujo</span>
+            <svg id="copilotSpinner" class="animate-spin h-4 w-4 text-white hidden" xmlns="http://www.w3.org/2000/svg"
+              fill="none" viewBox="0 0 24 24">
+              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+              <path class="opacity-75" fill="currentColor"
+                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z">
+              </path>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+      <!-- Chat Tab -->
+      <div id="panelChat" class="absolute inset-0 flex flex-col hidden bg-gray-50">
+        <!-- Chat Toolbar -->
+        <div class="p-2 border-b bg-white flex justify-end">
+          <button id="copilotChatReset"
+            class="text-xs text-red-500 hover:text-red-700 flex items-center gap-1 px-2 py-1 rounded hover:bg-red-50"
+            title="Borrar historial y contexto de chat">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+            Nueva Conversación
+          </button>
+        </div>
+        <div id="copilotChatHistory" class="flex-1 overflow-y-auto p-4 space-y-3">
+          <div class="flex gap-2 items-start">
+            <div class="w-8 h-8 rounded-full bg-indigo-100 flex items-center justify-center shrink-0">🤖</div>
+            <div class="bg-white p-3 rounded-tr-xl rounded-br-xl rounded-bl-xl shadow-sm text-sm text-gray-700 border">
+              Hola, soy tu experto en BRI Flow. ¿En qué puedo ayudarte?
+            </div>
+          </div>
+        </div>
+
+        <div class="p-3 bg-white border-t flex gap-2 items-center">
+          <button id="copilotChatBtnAttach"
+            class="p-2 text-gray-400 hover:text-indigo-600 hover:bg-gray-100 rounded-lg transition-colors"
+            title="Adjuntar archivo">
+            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24"
+              stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+          </button>
+          <input id="copilotChatInput" type="text" placeholder="Tu pregunta..."
+            class="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-transparent text-sm">
+          <button id="copilotChatSend"
+            class="p-2 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors">
+            <svg aria-hidden="true" class="w-5 h-5" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <line x1="22" y1="2" x2="11" y2="13"></line>
+              <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+            </svg>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+</div>
+
+<!-- Copilot Settings Modal (Nested or separate) -->
+<div id="copilotSettingsModal" class="fixed inset-0 z-[410] hidden items-center justify-center bg-black bg-opacity-20"
+  aria-hidden="true">
+  <div class="w-full max-w-sm bg-white rounded-lg shadow-xl p-6">
+    <h3 class="text-lg font-bold mb-4 text-gray-800">Configuración Copilot</h3>
+
+    <div class="mb-4">
+      <label class="block text-sm font-medium text-gray-700 mb-1">Proveedor IA</label>
+      <select id="cpSettingsProvider" class="w-full border rounded px-3 py-2 text-sm">
+        <option value="azure">Azure OpenAI</option>
+        <option value="ollama">Ollama (Local)</option>
+      </select>
+    </div>
+
+    <!-- Azure Fields -->
+    <div id="cpSettingsAzure" class="space-y-3">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Azure Endpoint</label>
+        <input type="text" id="cpSettingsAzureEndpoint" class="w-full border rounded px-3 py-2 text-sm"
+          placeholder="https://my-resource.openai.azure.com/..." />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">API Key</label>
+        <input type="password" id="cpSettingsAzureKey" class="w-full border rounded px-3 py-2 text-sm" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Deployment Name (Model)</label>
+        <input type="text" id="cpSettingsAzureModel" class="w-full border rounded px-3 py-2 text-sm"
+          placeholder="gpt-4o" />
+      </div>
+    </div>
+
+    <!-- Ollama Fields -->
+    <div id="cpSettingsOllama" class="space-y-3 hidden">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Ollama Endpoint</label>
+        <input type="text" id="cpSettingsOllamaEndpoint" class="w-full border rounded px-3 py-2 text-sm"
+          value="http://localhost:11434" />
+      </div>
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Model Name</label>
+        <input type="text" id="cpSettingsOllamaModel" class="w-full border rounded px-3 py-2 text-sm"
+          value="llama3.1" />
+        <p class="text-xs text-amber-600 mt-1">Nota: Ollama soporta max ~32k tokens. El contexto se optimizará.</p>
+      </div>
+    </div>
+
+    <div class="mt-6 flex justify-end gap-2">
+      <button id="cpSettingsCancel" class="px-4 py-2 border rounded hover:bg-gray-50 text-sm">Cancelar</button>
+      <button id="cpSettingsSave"
+        class="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700 text-sm">Guardar</button>
+    </div>
+  </div>
+</div>

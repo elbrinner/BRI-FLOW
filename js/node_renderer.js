@@ -27,7 +27,11 @@
     file_upload: { color: '#06b6d4', bg: 'linear-gradient(90deg,#ecfeff,#fff)', icon: '📎', label: 'File Upload' },
     json_upload: { color: '#f59e0b', bg: 'linear-gradient(90deg,#fffbeb,#fff)', icon: '📋', label: 'JSON Upload' },
     json_export: { color: '#10b981', bg: 'linear-gradient(90deg,#f0fdf4,#fff)', icon: '📥', label: 'JSON Export' },
-    file_download: { color: '#8b5cf6', bg: 'linear-gradient(90deg,#faf5ff,#fff)', icon: '💾', label: 'File Download' }
+    file_download: { color: '#8b5cf6', bg: 'linear-gradient(90deg,#faf5ff,#fff)', icon: '💾', label: 'File Download' },
+    event_start: { color: '#d8b4fe', bg: 'linear-gradient(90deg,#f3e8ff,#fff)', icon: '⚡', label: 'Event Start' },
+    human_validation: { color: '#fdba74', bg: 'linear-gradient(90deg,#fff7ed,#fff)', icon: '🛡️', label: 'Human Validation' },
+    coordinator: { color: '#14b8a6', bg: 'linear-gradient(90deg,#e0fdf8,#fff)', icon: '🕸️', label: 'Coordinator' },
+    voice_agent: { color: '#67e8f9', bg: 'linear-gradient(90deg,#ecfeff,#fff)', icon: '🎙️', label: 'Voice Agent' }
   };
 
   // Helpers locales para formatear valores mostrados en nodos
@@ -222,16 +226,37 @@
       }
     } catch (e) { /* noop */ }
 
-    n.addEventListener('click', (ev) => { ev.stopPropagation(); if (typeof selectNodeFn === 'function') selectNodeFn(node.id); });
+    let isDragging = false;
+
+    console.log('[node_renderer] Setting up drag events for node:', node.id, 'draggable:', n.draggable);
+
+    n.addEventListener('click', (ev) => {
+      ev.stopPropagation();
+      if (isDragging) return;
+      if (typeof selectNodeFn === 'function') selectNodeFn(node.id);
+    });
+    n.addEventListener('mousedown', (ev) => {
+      console.log('[node_renderer] mousedown on node:', node.id);
+      ev.stopPropagation();
+    }); // Prevent canvas selection/pan from activating
 
     n.addEventListener('dragstart', (ev) => {
+      console.log('[node_renderer] dragstart triggered for node:', node.id);
+      isDragging = true;
       ev.dataTransfer.setData('text/plain', node.id);
       const rect = n.getBoundingClientRect();
       ev.dataTransfer.setData('dragOffsetX', String((ev.clientX - rect.left) / (zoom || 1)));
       ev.dataTransfer.setData('dragOffsetY', String((ev.clientY - rect.top) / (zoom || 1)));
+      console.log('[node_renderer] dragstart data set:', { nodeId: node.id, offsetX: (ev.clientX - rect.left) / (zoom || 1), offsetY: (ev.clientY - rect.top) / (zoom || 1) });
+    });
+    n.addEventListener('dragend', () => {
+      console.log('[node_renderer] dragend for node:', node.id);
+      // Small delay to suppress the subsequent click event
+      setTimeout(() => { isDragging = false; }, 50);
     });
 
     n.addEventListener('dblclick', () => { if (typeof selectNodeFn === 'function') { selectNodeFn(node.id); const el = document.getElementById('prop_id'); if (el) el.focus(); } });
+
 
     if (canvasInner) canvasInner.appendChild(n);
     // If this is a button node, show a small preview of its options

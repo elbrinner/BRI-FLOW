@@ -5,13 +5,15 @@ Este documento describe cada tipo de nodo disponible en BRI-FLOW, sus propiedade
 Nota: el JSON generado por el editor requiere un backend/intérprete externo (no incluido en este repo) para su ejecución real.
 
 ## Índice rápido
-- Ir directo a: [Expresiones y funciones disponibles](#expresiones-y-funciones-disponibles)
+- Ir directo a: [Expresiones y funciones](expresiones.md)
+- Tipos de nodo (paleta): `start`, `response`, `hidden_response`, `input`, `assign_var`, `choice` / `choice_switch`, `button`, `multi_button`, `rest_call`, `condition`, `loop` / `foreach` / `while`, `flow_jump`, `set_goto`, `hero_card`, `carousel`, `form`, `file_upload`, `json_upload`, `json_export`, `file_download`, `extra`, `debug`, `agent_call`, `use_profile`, `credential_profile`, `end`
 
 ## Inicio (start)
 - Propósito: Define variables globales iniciales y los idiomas (locales) del flujo. Solo puede existir un `start` por flujo.
 - Props clave:
   - `variables`: lista de objetos { name, defaultValue, isList }.
-  - `meta.locales`: array de códigos de idioma (p. ej., ["es", "en"]).
+  - `locales`: array de códigos de idioma (p. ej., ["es", "en"]). El editor lo sincroniza también en `meta.locales` por compatibilidad.
+  - `enable_debug` (bool, opcional): habilita señales/debug del runtime.
   - `next`: primer nodo a ejecutar.
 - Notas: El panel muestra/edita tags de idioma y variables. El `start` no se puede renombrar ni eliminar.
 
@@ -29,10 +31,13 @@ Nota: el JSON generado por el editor requiere un backend/intérprete externo (no
 ## Asignar variable (assign_var)
 - Type: `assign_var`
 - Propósito: Asigna uno o varios valores a variables en el contexto.
-- Props:
-  - `assignments`: array de { target, value }. `target` puede incluir ruta (p. ej.: `persona.nombre`).
+- Props (formas soportadas):
+  - Simple (la más común en el editor): `target` (string) y `value` (string/JSON).
+  - Bulk (compat/avanzado): `assignments` (array) aceptando claves como `{ name|target|variable, valueExpr|value|expression }`.
   - `next`.
-- Notas: admite evaluación de expresiones dentro de `{{ ... }}` y referencias tipo `context.*`.
+- Notas:
+  - Admite `{{ ... }}` en `value`/`valueExpr`.
+  - Si usas rutas (p. ej. `persona.nombre`) depende del runtime si crea/actualiza objetos.
 
 ## Decisión (choice)
 - Type: `choice`
@@ -71,20 +76,23 @@ Nota: el JSON generado por el editor requiere un backend/intérprete externo (no
 ## Agente (agent_call)
 - Type: `agent_call`
 - Propósito: Invoca un agente de conversación integrado (Agent Framework) con opción de streaming SSE o ejecución sin streaming guardando en variable.
-- Props clave:
-  - `agent` | `agent_profile` (string): perfil del agente. Valores: `normal`, `rag`, `coordinator`, `retrieval`, `domain_expert`.
-  - `message` (string): texto del usuario; admite plantillas `{{ }}`. Recomendado: `{{ input }}`.
-  - `system_prompt` (string): instrucciones/rol del sistema.
-  - `thread_var` (string): variable para conservar el id de hilo entre turnos.
-  - `stream` (bool): `true` para SSE (pinta una sola burbuja incremental); `false` para ejecución sincronizada.
-  - `save_as` (string): variable destino de la respuesta (clave cuando `stream=false` o en modo `retrieval`).
-  - `search` (obj, opcional): configuración de búsqueda para `rag/retrieval` (p. ej., `mode`, `indexes`, `topK`, `semanticConfiguration`).
-  - `participants` (array, opcional): cuando `agent = "coordinator"`, define sub‑agentes a orquestar. Valores:
+- Props clave (preferido): se guardan en `props.*`.
+  - Compatibilidad: si un flujo trae campos legacy en raíz (`agent_profile`, `message`, etc.), al guardar se normalizan a `props.*`.
+  - `props.agent_profile` (string): perfil del agente. Valores típicos: `normal`, `rag`, `coordinator`, `retrieval`, `domain_expert` (y otros perfiles avanzados si el runtime los soporta).
+  - `props.execution_mode` (string): `local` | `remote`.
+  - `props.message` (string): texto del usuario; admite plantillas `{{ }}`. Recomendado: `{{ input }}`.
+  - `props.system_prompt` (string): instrucciones/rol del sistema.
+  - `props.stream` (bool): `true` para SSE; `false` para ejecución sin streaming.
+  - `props.save_as` (string): variable destino de la respuesta.
+  - `props.tooling` (array): lista simple de herramientas.
+  - `props.model` (obj): configuración del modelo.
+  - `props.search` (obj, opcional): configuración de búsqueda para `rag/retrieval`.
+  - `props.participants` (array, opcional): cuando `agent_profile = "coordinator"`, define participantes a orquestar.
     - `retrieval`: prepara contexto (no genera texto por sí mismo).
     - `rag`: usa RAG (adjunta herramienta nativa cuando está disponible y, si no, concatena contexto) y cita fuentes cuando aplique.
     - `domain_expert`: tono/políticas de experto.
     - `normal`: asistente general.
-  - `mode` (string, opcional): sólo con `agent = "coordinator"`. Valores soportados: `sequential`, `group_chat`, `fanout`.
+  - `props.mode` (string, opcional): sólo con `agent_profile = "coordinator"`. Valores habituales: `sequential`, `group_chat`, `fanout`.
     - `sequential`: ejecuta participantes en orden; el último se emite en streaming si `stream=true`.
     - `group_chat`: rondas cortas entre participantes y una síntesis final (el paso de síntesis se streamea).
     - `fanout`: ejecuta participantes en paralelo, selecciona una respuesta ganadora por heurística simple (domain_expert > rag > longitud) y suma el coste total.
@@ -94,15 +102,9 @@ Notas importantes
 - Evita `{{ }}` con saltos de línea; escribe `{{ input }}` en una sola línea.
 - Si `message` queda vacío, el backend omite la llamada para evitar errores y lo reporta en logs.
 
-Perfiles y soporte actual
+Perfiles
 
-| Perfil          | Descripción breve                                      | Estado backend |
-|-----------------|---------------------------------------------------------|----------------|
-| normal          | Conversación sin recuperación externa                   | OK             |
-| rag             | Grounding con Azure AI Search + citaciones              | OK (tool nativa cuando disponible; fallback a concatenación) |
-| retrieval       | Solo recuperación (no genera texto)                     | OK             |
-| domain_expert   | Experto con políticas/tono; sin RAG por defecto         | OK (como normal con prompt de dominio) |
-| coordinator     | Orquesta subagentes y fusiona respuestas                | Real (modes: sequential, group_chat, fanout; mínimos) |
+Los perfiles disponibles y su comportamiento dependen del runtime/backend configurado. El editor expone perfiles comunes como `normal`, `rag`, `coordinator`, `retrieval`, `domain_expert`.
 
 Ejemplo mínimo (no‑stream → pintar luego con `response`)
 
@@ -110,13 +112,14 @@ Ejemplo mínimo (no‑stream → pintar luego con `response`)
 {
   "id": "ag_pregunta",
   "type": "agent_call",
-  "agent": "rag",
-  "message": "{{ input }}",
-  "system_prompt": "Responde con citas cuando existan.",
-  "thread_var": "agent_thread_id",
-  "search": { "mode": "hybrid", "indexes": ["docs-es"], "topK": 5, "semanticConfiguration": "semantic-es" },
-  "save_as": "agent_result",
-  "stream": false,
+  "props": {
+    "agent_profile": "rag",
+    "message": "{{ input }}",
+    "system_prompt": "Responde con citas cuando existan.",
+    "search": { "mode": "hybrid", "indexes": ["docs-es"], "topK": 5, "semanticConfiguration": "semantic-es" },
+    "save_as": "agent_result",
+    "stream": false
+  },
   "next": "r_mostrar"
 }
 ```
@@ -142,15 +145,16 @@ Secuencial con 3 participantes (retrieval → domain_expert → rag)
 {
   "id": "ag_coord_seq",
   "type": "agent_call",
-  "agent": "coordinator",
-  "mode": "sequential",
-  "participants": ["retrieval","domain_expert","rag"],
-  "message": "{{ input }}",
-  "system_prompt": "Consolida respuestas claras usando el contexto when available.",
-  "thread_var": "agent_thread_id",
-  "search": { "mode": "hybrid", "indexes": ["docs-es"], "topK": 5, "semanticConfiguration": "semantic-es" },
-  "stream": false,
-  "save_as": "agent_result",
+  "props": {
+    "agent_profile": "coordinator",
+    "mode": "sequential",
+    "participants": ["retrieval","domain_expert","rag"],
+    "message": "{{ input }}",
+    "system_prompt": "Consolida respuestas claras usando el contexto when available.",
+    "search": { "mode": "hybrid", "indexes": ["docs-es"], "topK": 5, "semanticConfiguration": "semantic-es" },
+    "stream": false,
+    "save_as": "agent_result"
+  },
   "next": "r_mostrar"
 }
 ```
@@ -161,14 +165,15 @@ Group chat con síntesis final (streameada)
 {
   "id": "ag_coord_gc",
   "type": "agent_call",
-  "agent": "coordinator",
-  "mode": "group_chat",
-  "participants": ["domain_expert","rag"],
-  "message": "{{ input }}",
-  "system_prompt": "Facilita un debate breve entre participantes y sintetiza una única respuesta final.",
-  "thread_var": "agent_thread_id",
-  "search": { "mode": "semantic", "indexes": ["docs-es"], "topK": 3, "semanticConfiguration": "semantic-es" },
-  "stream": true,
+  "props": {
+    "agent_profile": "coordinator",
+    "mode": "group_chat",
+    "participants": ["domain_expert","rag"],
+    "message": "{{ input }}",
+    "system_prompt": "Facilita un debate breve entre participantes y sintetiza una única respuesta final.",
+    "search": { "mode": "semantic", "indexes": ["docs-es"], "topK": 3, "semanticConfiguration": "semantic-es" },
+    "stream": true
+  },
   "next": "end"
 }
 ```
@@ -209,6 +214,11 @@ Group chat con síntesis final (streameada)
 - Type: `json_export`
 - Props: `filename`, `description`, `template` (objeto JSON), `next`.
 
+## Subir JSON (json_upload)
+- Type: `json_upload`
+- Propósito: Permite subir un archivo `.json`, validarlo y enviarlo como `extra` al runtime (y opcionalmente guardarlo como variable local).
+- Props: `prompt`, `validate` (bool), `save_parsed`/`save_as` (opcional), `schema` (JSON Schema, opcional), `on_error` (`show|fail`), `next`.
+
 ## Hero Card (hero_card)
 - Type: `hero_card`
 - Props: `title`, `subtitle`, `text`, `image_url`, `buttons` (array), `next`.
@@ -219,11 +229,39 @@ Group chat con síntesis final (streameada)
 
 ## Respuesta oculta (hidden_response)
 - Type: `hidden_response`
-- Props: `varName`, `value`, `next`.
+- Propósito: Evalúa/transporta información sin mostrarla en UI.
+- Props: `dataInfo` (o `data_info`), `next`.
 
 ## Debug (debug)
 - Type: `debug`
 - Props: `message` (plantilla), `payload` (texto/JSON), `save_as` (opcional), `next`.
+
+## Usar perfil de credenciales (use_profile)
+- Type: `use_profile`
+- Propósito: Establece el perfil activo para que los nodos siguientes lo usen.
+- Props (preferido): `props.profile`.
+- Nota: este nodo se exporta “tal cual” (solo el nombre del perfil, no secretos).
+
+## Definir perfil de credenciales (credential_profile)
+- Type: `credential_profile`
+- Propósito: Definir credenciales locales para el simulador.
+- Props (preferido): `props.profile`, `props.credentials` (JSON), `props.persist` (bool), `props.activate` (bool), `__sim_only: true`.
+- Nota: **solo para simulador**; no debería exportarse a entornos reales.
+
+## Event Start (event_start)
+- Type: `event_start`
+- Propósito: Inicio de flujo por evento (si el runtime lo soporta).
+- Props: `event_type` (p.ej. `webhook`), `filter_expr`.
+
+## Human Validation (human_validation)
+- Type: `human_validation`
+- Propósito: Validación humana con timeout (si el runtime lo soporta).
+- Props: `timeout` (segundos), `approvers` (roles/usuarios), `on_timeout` (target).
+
+## Coordinator (coordinator)
+- Type: `coordinator`
+- Propósito: Orquestación de sub-agentes (si el runtime lo soporta).
+- Props: `strategy` (`fan_out|round_robin|sequential`), `sub_agents` (lista), `aggregation` (`concat|summarize`).
 
 ## Fin (end)
 - Type: `end`

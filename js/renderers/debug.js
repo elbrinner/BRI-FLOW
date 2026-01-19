@@ -1,50 +1,130 @@
 // Renderer for debug node (editor)
-(function(){
-  function renderDebug(node, container, nodeIds){
-    const el = document.createElement('div');
-    el.className = 'debug-node-editor';
-    const msg = document.createElement('label'); msg.textContent = 'Message (template)';
-    const ta = document.createElement('textarea'); ta.value = node && node.message ? node.message : '';
-    ta.style.width = '100%'; ta.style.height = '60px';
-    const payloadLabel = document.createElement('label'); payloadLabel.textContent = 'Payload (JSON or text)';
-    const payload = document.createElement('textarea'); payload.style.width = '100%'; payload.style.height = '80px'; payload.value = node && node.payload ? (typeof node.payload === 'string' ? node.payload : JSON.stringify(node.payload, null, 2)) : '';
-    const saveAsLabel = document.createElement('label'); saveAsLabel.textContent = 'Save as (variable)';
-    const saveAs = document.createElement('input'); saveAs.type = 'text'; saveAs.value = node && node.save_as ? node.save_as : '';
-    el.appendChild(msg); el.appendChild(ta); el.appendChild(payloadLabel); el.appendChild(payload); el.appendChild(saveAsLabel); el.appendChild(saveAs);
-    // Expose getters for formbuilder
-    el.readValues = function(){ return { message: ta.value, payload: payload.value, save_as: saveAs.value }; };
-    el.getValue = function(){ return { message: ta.value, payload: payload.value, save_as: saveAs.value }; };
+(function () {
+  function renderDebug(node, container, nodeIds) {
+    const { adoptTemplate, setupValidation, markFieldUsed } = window.RendererHelpers || {};
+    const H = window.FormBuilderHelpers || {};
+    const el = H.el || function (tag, attrs = {}, children = []) { const e = document.createElement(tag); (children || []).forEach(c => e.appendChild(c)); return e; };
 
-    // Preview button: evaluate message against simulator variables if available
-    const previewBtn = document.createElement('button'); previewBtn.textContent = 'Preview'; previewBtn.className = 'px-2 py-1 bg-sky-600 text-white rounded ml-2';
-    previewBtn.addEventListener('click', () => {
-      try{
-        const msg = ta.value || '';
-        let evaluated = msg;
-        if (window.Simulador && typeof window.Simulador.getRuntimeState === 'function'){
-          const st = window.Simulador.getRuntimeState();
-          const vars = st?.state?.variables ?? {};
-          // simple interpolation of {{var}} using vars
-          evaluated = String(msg).replace(/\{\{\s*([^}]+)\s*\}\}/g, (_,k) => {
-            const key = k.trim().replace(/\s*\.\s*/g,'.');
-            const parts = key.split('.').filter(Boolean);
-            let v = vars;
-            for(const p of parts){ if (v == null) { v = undefined; break; } v = v[p]; }
-            if (v === undefined || v === null) return '';
-            if (typeof v === 'object') return JSON.stringify(v);
-            return String(v);
-          });
-        }
-        // show preview in a small modal-like alert
-        const md = document.createElement('div'); md.className='preview-box'; md.style.padding='8px'; md.style.background='#fff'; md.style.border='1px solid #e5e7eb'; md.style.borderRadius='6px'; md.style.maxWidth='540px'; md.style.whiteSpace='pre-wrap'; md.textContent = evaluated;
-        // append temporarily to document body
-        document.body.appendChild(md);
-        setTimeout(()=>{ md.remove(); }, 2500);
-      }catch(e){ console.warn('Preview failed', e); }
+    container.innerHTML = ''; // Start clean
+
+    // 1. Message (Template) - Primary Field
+    container.appendChild(H.inputRow({
+      label: 'Contenido (Texto con {{variables}})',
+      id: 'debug_message',
+      value: node.message || '',
+      placeholder: 'Ej:\nHola {{user.name}},\nTu saldo es {{saldo}}',
+      type: 'textarea'
+    }));
+
+    // 2. Variables / Items List
+    const listLabel = el('label', { style: 'display:block; margin-top:12px; font-weight:600; font-size:12px;' }, [document.createTextNode('Variables a Inspeccionar')]);
+    container.appendChild(listLabel);
+
+    const itemsContainer = el('div', { class: 'debug-items-list', style: 'margin-bottom:12px; border:1px solid #eee; padding:5px; border-radius:4px;' });
+    const items = Array.isArray(node.debug_items) ? node.debug_items : [];
+
+    function renderItems() {
+      itemsContainer.innerHTML = '';
+      if (items.length === 0) {
+        itemsContainer.appendChild(el('div', { style: 'color:#999;font-size:11px;padding:4px;' }, [document.createTextNode('Sin variables. Añade una abajo.')]));
+      } else {
+        items.forEach((item, idx) => {
+          const row = el('div', { style: 'display:flex; gap:5px; margin-bottom:5px; align-items:center;' });
+
+          // Label Input
+          const lblInp = el('input', { type: 'text', placeholder: 'Etiqueta', value: item.label || '', style: 'flex:1; border:1px solid #ddd; padding:4px; border-radius:3px; font-size:12px;' });
+          lblInp.oninput = (e) => { item.label = e.target.value; };
+
+          // Value Input
+          const valWrapper = el('div', { style: 'flex:2; position:relative;' });
+          const valInp = el('input', { type: 'text', placeholder: 'Valor ({{var}})', value: item.value || '', style: 'width:100%; border:1px solid #ddd; padding:4px; border-radius:3px; font-size:12px;' });
+          valInp.oninput = (e) => { item.value = e.target.value; };
+          valWrapper.appendChild(valInp);
+
+          // Expander for Value
+          if (H.openExpandedModal) {
+            const expBtn = el('button', { type: 'button', text: '⤢', title: 'Expandir', style: 'position:absolute; right:2px; top:2px; height:22px; width:22px; padding:0; background:#f0f0f0; border:1px solid #ccc; cursor:pointer;' });
+            expBtn.onclick = () => H.openExpandedModal(valInp);
+            valWrapper.appendChild(expBtn);
+          }
+
+          // Delete Button
+          const delBtn = el('button', { type: 'button', text: '✕', title: 'Borrar', style: 'color:red; cursor:pointer; background:none; border:none; padding:0 5px;' });
+          delBtn.onclick = () => { items.splice(idx, 1); navSync(); renderItems(); };
+
+          row.appendChild(lblInp);
+          row.appendChild(valWrapper);
+          row.appendChild(delBtn);
+          itemsContainer.appendChild(row);
+        });
+      }
+    }
+
+    const addBtn = el('button', { type: 'button', text: '+ Añadir Variable', class: 'btn-small', style: 'margin-bottom:10px;' });
+    addBtn.onclick = () => { items.push({ label: '', value: '' }); navSync(); renderItems(); };
+
+    container.appendChild(itemsContainer);
+    container.appendChild(addBtn);
+
+    // Sync helper
+    function navSync() {
+      node.debug_items = items;
+    }
+    renderItems();
+
+
+    // 3. Save As (Top level convenience)
+    container.appendChild(H.inputRow({
+      label: 'Guardar Resultado en Contexto (Opcional)',
+      id: 'debug_save_as',
+      value: node.save_as || '',
+      placeholder: 'nombre_variable'
+    }));
+
+
+    // 4. Advanced (Raw Payload)
+    const advToggle = el('button', { type: 'button', text: '▶ Opciones Avanzadas (Payload)', style: 'display:block; margin-top:15px; background:none; border:none; color:#007bff; cursor:pointer; font-size:12px; padding:0;' });
+    const advBox = el('div', { style: 'display:none; margin-top:10px; border-left:2px solid #ddd; padding-left:10px;' });
+
+    // Payload
+    const payloadVal = (typeof node.payload === 'object' && node.payload !== null) ? JSON.stringify(node.payload, null, 2) : (node.payload || '');
+    const plRow = H.inputRow({
+      label: 'Raw Payload (JSON / Texto / Expr)',
+      id: 'debug_payload',
+      value: payloadVal,
+      placeholder: 'Overwrites items list if set',
+      type: 'textarea'
     });
-    el.appendChild(previewBtn);
-    container.appendChild(el);
-    return el;
+    // Add expander for payload
+    setTimeout(() => {
+      const ta = plRow.querySelector('textarea');
+      if (ta && H.openExpandedModal && ta.parentElement) {
+        ta.parentElement.style.position = 'relative';
+        const btn = el('button', { type: 'button', text: '⤢', style: 'position:absolute;right:5px;top:28px;z-index:9;background:#eee;border:1px solid #ccc;cursor:pointer;' });
+        btn.onclick = () => H.openExpandedModal(ta);
+        ta.parentElement.appendChild(btn);
+      }
+    }, 0);
+    advBox.appendChild(plRow);
+
+    advToggle.onclick = () => {
+      const isHidden = advBox.style.display === 'none';
+      advBox.style.display = isHidden ? 'block' : 'none';
+      advToggle.textContent = (isHidden ? '▼' : '▶') + ' Opciones Avanzadas (Payload)';
+    };
+
+    container.appendChild(advToggle);
+    container.appendChild(advBox);
+
+    // Listeners for standard fields
+    container.addEventListener('input', (e) => {
+      const t = e.target;
+      if (t.id === 'debug_message') node.message = t.value;
+      if (t.id === 'debug_save_as') node.save_as = t.value;
+      if (t.closest && t.closest('#debug_payload')) node.payload = t.value;
+    });
+
+    return container;
   }
   window.RendererRegistry = window.RendererRegistry || {};
   window.RendererRegistry.debug = renderDebug;

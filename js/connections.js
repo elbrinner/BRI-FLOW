@@ -8,8 +8,9 @@
   let _refreshInProgress = false;
   let _queuedRefresh = false;
 
-  function init(jsPlumbObj) {
+  function init(jsPlumbObj, canvasInnerEl) {
     jsPlumbRef = jsPlumbObj;
+    console.log('[AppConnections] Initialized with jsPlumb');
   }
 
   function addEndpoints(state, nodeId) {
@@ -41,18 +42,37 @@
     if (typeof t === 'string') return t;
     if (typeof t === 'object') {
       // Si especifica flow_id y es diferente al actual, no dibujar línea
-      if (t.flow_id && currentFlowId && t.flow_id !== currentFlowId) return null;
+      // Cadena vacía o undefined se considera "mismo flujo"
+      const targetFlowId = t.flow_id || currentFlowId;
+      if (targetFlowId && currentFlowId && targetFlowId !== currentFlowId) {
+        return null;
+      }
       return t.node_id;
     }
     return null;
   }
 
   function refreshConnections(state) {
-    if (!jsPlumbRef) return;
-    if (_refreshInProgress) { _queuedRefresh = true; return; }
+    console.log('[AppConnections] refreshConnections called', {
+      hasJsPlumb: !!jsPlumbRef,
+      inProgress: _refreshInProgress,
+      nodeCount: state?.nodes ? Object.keys(state.nodes).length : 0,
+      flowId: state?.meta?.flow_id
+    });
+
+    if (!jsPlumbRef) {
+      console.warn('[AppConnections] refreshConnections: jsPlumb not initialized');
+      return;
+    }
+    if (_refreshInProgress) {
+      console.log('[AppConnections] refreshConnections: already in progress, queuing');
+      _queuedRefresh = true;
+      return;
+    }
     _refreshInProgress = true;
 
     const currentFlowId = (state.meta && state.meta.flow_id) ? state.meta.flow_id : '';
+    console.log('[AppConnections] Starting refresh for flow:', currentFlowId);
 
     try { if (jsPlumbRef.setSuspendDrawing) jsPlumbRef.setSuspendDrawing(true); } catch (_e) { }
     try { if (jsPlumbRef.deleteEveryConnection) jsPlumbRef.deleteEveryConnection(); } catch (_e) { }
@@ -79,8 +99,9 @@
 
     for (const id in state.nodes) {
       const node = state.nodes[id] || {};
-      // next: para button y multi_button, solo conectar en modo dinámico
-      if (!((node.type === 'button' || node.type === 'multi_button') && node.mode !== 'dynamic')) {
+      // next: para button y multi_button, solo conectar en modo dinámico.
+      // También excluir flow_jump, que maneja sus propias conexiones (Jump/Return).
+      if (!((node.type === 'button' || node.type === 'multi_button') && node.mode !== 'dynamic') && node.type !== 'flow_jump') {
         pushSpec(id, resolveTargetRef(node.next, currentFlowId), null);
       }
       // choice: modo switch -> cases y default_target
@@ -141,8 +162,7 @@
       pushSpec(id, resolveTargetRef(node.body_start, currentFlowId), 'BODY');
       pushSpec(id, resolveTargetRef(node.after_loop, currentFlowId), 'AFTER');
       if (node.loop_body) pushSpec(id, resolveTargetRef(node.loop_body, currentFlowId), '🔁 Loop', { isLoopBody: true });
-      // set_goto return
-      if (node.type === 'set_goto' && node.target) pushSpec(id, resolveTargetRef(node.target, currentFlowId), 'return', { isGotoReturn: true });
+
       // flow_jump y su return_target
       if (node.type === 'flow_jump') {
         pushSpec(id, resolveTargetRef(node.target, currentFlowId), 'Jump');
@@ -150,11 +170,115 @@
       }
     }
 
+    // Synthetic Loop Return: Auto-detect end of loop body and draw specific return line
+    try {
+      const leafCandidates = {}; // map: leafId -> { loopId, dist }
+
+      for (const id in state.nodes) {
+        const loopNode = state.nodes[id];
+        const type = (loopNode.type || '').toLowerCase();
+        if (!loopNode || (type !== 'foreach' && type !== 'loop' && type !== 'while')) continue;
+
+        const bodyStartRef = loopNode.body_start || loopNode.loop_body;
+        const bodyStartId = resolveTargetRef(bodyStartRef, currentFlowId);
+        if (!bodyStartId) continue;
+
+        // Robust BFS Traversal to find all "leaf" nodes (nodes with no active exit)
+        // Scoped PER LOOP so each loop identifies its own returns independently.
+        const leaves = new Set();
+        const visited = new Set();
+        const queue = [{ id: bodyStartId, dist: 1 }];
+
+        while (queue.length > 0) {
+          const item = queue.shift();
+          const currId = item.id;
+          const dist = item.dist;
+
+          if (visited.has(currId)) continue;
+          visited.add(currId);
+
+          const currNode = state.nodes[currId];
+          if (!currNode) continue;
+
+          let hasChildren = false;
+
+          // Helper to check and enqueue child
+          const check = (ref) => {
+            const t = resolveTargetRef(ref, currentFlowId);
+            // If t exists, this node HAS a child, so it's not a leaf in this branch.
+            if (t) {
+              hasChildren = true;
+              // Only traverse if not visited to avoid cycles
+              if (!visited.has(t)) queue.push({ id: t, dist: dist + 1 });
+            }
+          };
+
+          const currType = (currNode.type || '').toLowerCase();
+
+          // Branching logic based on node type
+          if (currType === 'condition') {
+            check(currNode.true_target);
+            check(currNode.false_target);
+          } else if (currType === 'choice') {
+            if (Array.isArray(currNode.cases)) {
+              currNode.cases.forEach(c => check(c.target));
+            }
+            if (currNode.default_target) check(currNode.default_target);
+            check(currNode.next);
+          } else if (currType === 'flow_jump') {
+            hasChildren = true; // Exits flow
+            if (currNode.return_target) check(currNode.return_target);
+          } else if (currType === 'foreach' || currType === 'loop' || currType === 'while') {
+            // CRITICAL FIX: Treat nested loops as black boxes.
+            // Do NOT enter body_start/loop_body. Only follow exit paths (next).
+            check(currNode.next);
+          } else {
+            // Standard & Generic connections
+            check(currNode.next);
+
+            // CRITICAL FIX: Check generic 'connections' array (used by some generic nodes)
+            if (Array.isArray(currNode.connections)) {
+              currNode.connections.forEach(c => check(c));
+            }
+
+            // Button/Multi-button options
+            if (Array.isArray(currNode.options)) {
+              currNode.options.forEach(o => check(o.next || o.target));
+            }
+          }
+
+          if (!hasChildren) {
+            // It's a leaf for THIS loop
+            // Store in candidates, preferring shorter distance (closest loop)
+            if (!leafCandidates[currId] || dist < leafCandidates[currId].dist) {
+              leafCandidates[currId] = { loopId: id, dist: dist };
+            }
+          }
+        }
+      }
+
+      // Finally, create connections for the winning candidates
+      Object.keys(leafCandidates).forEach(leafId => {
+        const winner = leafCandidates[leafId];
+        pushSpec(leafId, winner.loopId, null, { isLoopReturn: true });
+      });
+
+    } catch (e) {
+      console.warn('[AppConnections] Error in synthetic loop traversal', e);
+    }
+
+    console.log('[AppConnections] Connection specs collected:', {
+      count: toConnect.length,
+      specs: toConnect.map(s => `${s.source} -> ${s.target}${s.label ? ` (${s.label})` : ''}`)
+    });
+
     // Mantener pares creados entre intentos para saber cuándo terminamos
     const createdPairs = new Set();
+    console.log('[AppConnections] createdPairs initialized, defining doConnectPass...');
 
     function doConnectPass() {
       let createdCount = 0;
+      console.log('[AppConnections] doConnectPass: attempting to create connections');
 
       function ensureEndpointsFor(spec) {
         try {
@@ -175,23 +299,73 @@
 
       function connectWithGuards(spec) {
         if (!spec) return false;
+        const srcId = spec.source.replace(/^node_/, '');
         if (spec.source === spec.target) return false; // evitar self
         const key = spec.source + '|' + spec.target + '|' + (spec.label || '');
         if (createdPairs.has(key)) return true;
         const sEl = document.getElementById(spec.source);
         const tEl = document.getElementById(spec.target);
-        if (!sEl || !tEl) return false;
+
+        if (!sEl || !tEl) {
+          console.warn('[AppConnections] Missing element(s) for connection:', {
+            source: spec.source,
+            target: spec.target,
+            hasSource: !!sEl,
+            hasTarget: !!tEl
+          });
+          return false;
+        }
+
         ensureEndpointsFor(spec);
 
         const overlays = spec.label ? [['Label', { label: spec.label, location: 0.5 }]] : [];
         let paintStyle = { stroke: '#456', strokeWidth: 2 };
-        if (spec.isGotoReturn) paintStyle = { stroke: '#f97316', strokeWidth: 6 };
-        else if (spec.isLoopBody) paintStyle = { stroke: '#f97316', strokeWidth: 3 };
-        else if (spec.isChoiceDefault) paintStyle = { stroke: '#9333ea', strokeWidth: 3, dashstyle: '4 2' }; // morado y punteado para default
+
+        let connector = ['Flowchart', { stub: [15, 25], gap: 5, cornerRadius: 5, alwaysRespectStubs: true }];
+
+        if (spec.isGotoReturn) {
+          paintStyle = { stroke: '#f97316', strokeWidth: 6 };
+        } else if (spec.isLoopBody) {
+          paintStyle = { stroke: '#f97316', strokeWidth: 3 };
+        } else if (spec.isLoopReturn) {
+          // Circular visual style for loop return (StateMachine - Pink)
+          paintStyle = { stroke: '#ec4899', strokeWidth: 2, dashstyle: '4 2' };
+          // StateMachine connector for clean loop visualization
+          connector = ['StateMachine', { margin: 5, curviness: 10, proximityLimit: 80 }];
+
+          try {
+            jsPlumbRef.connect({
+              source: spec.source,
+              target: spec.target,
+              anchors: ['Continuous', 'Continuous'], // Let jsPlumb decide best path
+              overlays: [['Arrow', { location: 1, width: 10, length: 10 }]],
+              paintStyle: paintStyle,
+              connector: connector
+            });
+            createdPairs.add(key);
+            createdCount++;
+            console.log('[AppConnections] ✓ Created connection (Loop Return):', spec.source, '->', spec.target);
+            return true;
+          } catch (e) {
+            console.warn('[AppConnections] ✗ Failed to create connection (Loop Return):', spec.source, '->', spec.target, e.message);
+            return false;
+          }
+        } else if (spec.isChoiceDefault) {
+          paintStyle = { stroke: '#9333ea', strokeWidth: 3, dashstyle: '4 2' }; // morado y punteado para default
+        } else {
+          const srcNode = state.nodes[srcId];
+          if (srcNode && srcNode.type === 'event_start') {
+            paintStyle = { stroke: '#d8b4fe', strokeWidth: 3, dashstyle: '4 2' };
+          }
+        }
         try {
           jsPlumbRef.connect({ source: spec.source, target: spec.target, anchors: ['Continuous', 'Continuous'], overlays: overlays, paintStyle: paintStyle });
-          createdPairs.add(key); createdCount++; return true;
-        } catch (_e) {
+          createdPairs.add(key);
+          createdCount++;
+          console.log('[AppConnections] ✓ Created connection:', spec.source, '->', spec.target);
+          return true;
+        } catch (e) {
+          console.warn('[AppConnections] ✗ Failed to create connection:', spec.source, '->', spec.target, e.message);
           try {
             jsPlumbRef.connect({ source: spec.source, target: spec.target, overlays: overlays });
             createdPairs.add(key); createdCount++; return true;
@@ -205,10 +379,18 @@
       try { const _w = (document.getElementById('canvasInner') || {}).offsetWidth; void _w; } catch (_rf) { }
       for (let i = 0; i < toConnect.length; i++) { try { connectWithGuards(toConnect[i]); } catch (_e) { } }
       for (let j = 0; j < toConnect.length; j++) { try { connectWithGuards(toConnect[j]); } catch (_e) { } }
+
+      console.log('[AppConnections] doConnectPass complete:', {
+        attempted: toConnect.length,
+        created: createdCount,
+        total: createdPairs.size
+      });
+
       return createdCount;
     }
 
     function scheduleAttempts(attempt) {
+      console.log('[AppConnections] scheduleAttempts called, attempt:', attempt);
       const count = doConnectPass();
       const allBuilt = (createdPairs.size >= toConnect.length);
       try { if (jsPlumbRef.repaintEverything) jsPlumbRef.repaintEverything(); } catch (_e) { }
@@ -230,6 +412,7 @@
       }
     }
 
+    console.log('[AppConnections] About to schedule connection attempts');
     try {
       if (typeof requestAnimationFrame === 'function') requestAnimationFrame(function () { scheduleAttempts(0); });
       else setTimeout(function () { scheduleAttempts(0); }, 0);

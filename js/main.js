@@ -21,9 +21,6 @@ const App = (() => {
   // DOM refs (initialized in init)
   let canvas; // viewport (scrollable)
   let canvasInner; // large virtual canvas where nodes live
-  // Track base canvas size to enforce minimum when shrinking
-  let baseCanvasWidth = 0;
-  let baseCanvasHeight = 0;
   let jsonOutput;
   // removed unused DOM refs (propForm, noSelection, dynamicProps)
 
@@ -62,7 +59,7 @@ const App = (() => {
   let zoom = 1;
   // Simple debug flag for centering math
   const DEBUG_CENTER = !!(window && window.APP_DEBUG_CENTER);
-  function dlog(...args) { if (DEBUG_CENTER) try { console.log('[center]', ...args); } catch (_) {} }
+  function dlog(...args) { if (DEBUG_CENTER) try { console.log('[center]', ...args); } catch (_) { } }
   function getSnapEnabled() { return !!state.meta?.ui?.snapEnabled; }
   function setSnapEnabled(v) { if (!state.meta.ui) state.meta.ui = {}; state.meta.ui.snapEnabled = !!v; saveUiState(); }
   function getGridSize() { return Math.max(5, Math.min(200, Number(state.meta?.ui?.gridSize || 20))); }
@@ -168,48 +165,10 @@ const App = (() => {
   // create node object
   function createNode(type, x = 20, y = 20) {
     if (window.AppNodeFactory && typeof window.AppNodeFactory.createNode === 'function') {
-      try { return window.AppNodeFactory.createNode(type, x, y); } catch (e) { console.warn('AppNodeFactory.createNode failed', e); }
+      try { return window.AppNodeFactory.createNode(type, x, y); } catch (e) { console.error('AppNodeFactory.createNode failed', e); }
+    } else {
+      console.error('AppNodeFactory not available');
     }
-    // fallback: inline implementation (kept for compatibility)
-    // ...existing code...
-    // If trying to create a start but one exists, select and return existing start
-    if (type === 'start' && state.meta.start_node && state.nodes[state.meta.start_node]) {
-      selectNode(state.meta.start_node);
-      return state.nodes[state.meta.start_node];
-    }
-    const id = genId(type);
-    const base = { id, type, x, y, next: null };
-    if (type === 'start') {
-      const prev = state.meta.start_node;
-      if (prev && state.nodes[prev]) {
-        state.nodes[prev].type = 'response';
-        renderNode(state.nodes[prev]);
-      }
-      state.meta.start_node = id;
-      base.variables = base.variables || [];
-    }
-    const locales = Array.isArray(state.meta.locales) && state.meta.locales.length ? state.meta.locales : ['en'];
-    if (type === 'response') { base.i18n = {}; locales.forEach(l => { base.i18n[l] = { text: [] }; }); }
-    else if (type === 'input') { base.i18n = {}; locales.forEach(l => { base.i18n[l] = { prompt: '' }; }); base.save_as = ''; }
-    else if (type === 'choice') { base.i18n = {}; locales.forEach(l => { base.i18n[l] = { prompt: '' }; }); base.options = []; }
-    else if (type === 'rest_call') { base.method = 'GET'; base.url = ''; base.headers = {}; base.save_as = ''; base.save_path = ''; base.mappings = []; base.mock_mode = 'off'; base.mock = {}; }
-    else if (type === 'hero_card') { base.title = ''; base.subtitle = ''; base.text = ''; base.image_url = ''; base.buttons = []; }
-    else if (type === 'carousel') { base.cards = []; }
-    else if (type === 'form') { base.fields = []; }
-    else if (type === 'file_upload') { base.accept = ''; base.max_size = 0; base.save_as = ''; }
-    else if (type === 'json_export') { base.filename = 'export.json'; base.description = ''; base.template = {}; }
-    else if (type === 'file_download') { base.file_url = ''; base.filename = ''; base.description = ''; }
-    state.nodes[id] = base;
-    renderNode(base);
-    try { autoGrowCanvas(); } catch (e) { /* noop */ }
-    try { ensureNodeVisible(base, 120); } catch (e) { /* noop */ }
-    selectNode(id);
-    if (type !== 'start' && state.meta.start_node && state.nodes[state.meta.start_node]) {
-      const startNode = state.nodes[state.meta.start_node];
-      if (!startNode.next) { startNode.next = { flow_id: '', node_id: id }; renderNode(startNode); }
-    }
-    refreshOutput();
-    return base;
   }
 
   // Render a node DOM in canvas (delegates to AppRenderer or AppHelpers)
@@ -218,11 +177,17 @@ const App = (() => {
     try { window.AppRenderer.renderNode(state, node, canvasInner, zoom, addEndpoints, selectNode); return; } catch (e) { console.error('AppRenderer.renderNode failed', e); throw e; }
   }
   function selectNode(id) {
+    if (window.AppSelectionManager) {
+      window.AppSelectionManager.select(id);
+      return;
+    }
+    // Legacy fallback
     // Assumes AppRenderer is loaded before main.js (index.html ordering)
     try { window.AppRenderer.selectNode(state, id, canvas, showProperties); return; } catch (e) { console.error('AppRenderer.selectNode failed', e); throw e; }
   }
 
   function showProperties(node) {
+    console.log('[main] showProperties called with node:', node);
     if (window.AppEditor && typeof window.AppEditor.showProperties === 'function') {
       try { window.AppEditor.showProperties(state, node, { selectNode, renderVariables, collectVariables, refreshOutput }); return; } catch (e) { console.warn('AppEditor.showProperties failed', e); }
     }
@@ -332,151 +297,23 @@ const App = (() => {
 
   // Automatically expand the inner canvas to fit all nodes, with padding
   function autoGrowCanvas(padding = 1000) {
-    try {
-      if (!canvasInner) return;
-      const nodes = canvasInner.querySelectorAll('.node');
-      if (!nodes.length) return;
-      let maxRight = 0, maxBottom = 0;
-      nodes.forEach(el => {
-        const left = parseFloat(el.style.left) || 0;
-        const top = parseFloat(el.style.top) || 0;
-        const width = el.offsetWidth || 180;
-        const height = el.offsetHeight || 80;
-        maxRight = Math.max(maxRight, (left + width));
-        maxBottom = Math.max(maxBottom, (top + height));
-      });
-      const minW = baseCanvasWidth || canvasInner.scrollWidth || 8000;
-      const minH = baseCanvasHeight || canvasInner.scrollHeight || 6000;
-      const targetW = Math.max(minW, Math.ceil(maxRight + padding));
-      const targetH = Math.max(minH, Math.ceil(maxBottom + padding));
-      let changed = false;
-      // Resize both directions (grow or shrink) but never below min base size
-      if (Math.abs(targetW - canvasInner.scrollWidth) > 2) { canvasInner.style.width = targetW + 'px'; changed = true; }
-      if (Math.abs(targetH - canvasInner.scrollHeight) > 2) { canvasInner.style.height = targetH + 'px'; changed = true; }
-      if (changed) { try { if (typeof jsPlumb !== 'undefined') jsPlumb.repaintEverything(); } catch (e) { } }
-    } catch (e) { console.warn('autoGrowCanvas failed', e); }
+    if (window.AppCanvasManager && typeof window.AppCanvasManager.autoGrowCanvas === 'function') {
+      return window.AppCanvasManager.autoGrowCanvas(padding);
+    }
   }
 
   // Center viewport on the bounding box of all nodes.
-  // If adjustZoom=true, auto-zoom to fit bbox inside viewport with given margin (in CSS px).
   function fitCanvasToContent(margin = 80, adjustZoom = true) {
-    if (!canvas || !canvasInner) return;
-    try {
-      const nodeEls = canvasInner.querySelectorAll('.node');
-      const cs = getComputedStyle(canvas);
-      const padL = parseFloat(cs.paddingLeft) || 0;
-      const padR = parseFloat(cs.paddingRight) || 0;
-      const padT = parseFloat(cs.paddingTop) || 0;
-      const padB = parseFloat(cs.paddingBottom) || 0;
-      if ((!nodeEls || nodeEls.length === 0) && (!state.nodes || Object.keys(state.nodes).length === 0)) {
-        // No hay nodos: centrar vista por defecto sin tocar zoom
-        const effW = (canvas.clientWidth - padL - padR) / (zoom || 1);
-        const effH = (canvas.clientHeight - padT - padB) / (zoom || 1);
-        const targetLeft = Math.max(0, Math.floor(padL + (canvasInner.scrollWidth - effW) * 0.5));
-        const targetTop = Math.max(0, Math.floor(padT + (canvasInner.scrollHeight - effH) * 0.5));
-        dlog('no-nodes', { effW, effH, padL, padT, targetLeft, targetTop });
-        canvas.scrollLeft = targetLeft; canvas.scrollTop = targetTop; return;
-      }
-      let minLeft = Infinity, minTop = Infinity, maxRight = -Infinity, maxBottom = -Infinity;
-      // Preferir las coordenadas del modelo (state.nodes), ya que el DOM puede no tener style.left/top establecidos
-      for (const id in state.nodes) {
-        const n = state.nodes[id];
-        const el = document.getElementById('node_' + id);
-        const width = (el && el.offsetWidth) ? el.offsetWidth : 180;
-        const height = (el && el.offsetHeight) ? el.offsetHeight : 80;
-        const left = typeof n.x === 'number' ? n.x : (el ? (parseFloat(el.style.left) || 0) : 0);
-        const top = typeof n.y === 'number' ? n.y : (el ? (parseFloat(el.style.top) || 0) : 0);
-        minLeft = Math.min(minLeft, left);
-        minTop = Math.min(minTop, top);
-        maxRight = Math.max(maxRight, left + width);
-        maxBottom = Math.max(maxBottom, top + height);
-      }
-      // Si por alguna razón no se recorrieron nodos del estado, caer al DOM
-      if (!isFinite(minLeft) || !isFinite(minTop) || !isFinite(maxRight) || !isFinite(maxBottom)) {
-        for (const el of nodeEls) {
-          const left = parseFloat(el.style.left) || 0;
-          const top = parseFloat(el.style.top) || 0;
-          const width = el.offsetWidth || 180;
-          const height = el.offsetHeight || 80;
-          minLeft = Math.min(minLeft, left);
-          minTop = Math.min(minTop, top);
-          maxRight = Math.max(maxRight, left + width);
-          maxBottom = Math.max(maxBottom, top + height);
-        }
-      }
-      if (!isFinite(minLeft) || !isFinite(minTop) || !isFinite(maxRight) || !isFinite(maxBottom)) return;
-      // Calcular centro del bounding box y centrar viewport (considerando zoom)
-      const bboxWidth = Math.max(1, (maxRight - minLeft));
-      const bboxHeight = Math.max(1, (maxBottom - minTop));
-      const centerX = (minLeft + maxRight) / 2;
-      const centerY = (minTop + maxBottom) / 2;
-      let targetZoom = zoom || 1;
-      if (adjustZoom) {
-        const viewportW = canvas.clientWidth;
-        const viewportH = canvas.clientHeight;
-        const fitW = (viewportW - padL - padR) / (bboxWidth + 2 * margin);
-        const fitH = (viewportH - padT - padB) / (bboxHeight + 2 * margin);
-        const z = Math.min(fitW, fitH);
-        targetZoom = Math.max(0.2, Math.min(2, z));
-        if (Math.abs(targetZoom - (zoom || 1)) > 1e-3) setZoom(targetZoom);
-      }
-      const currentZoom = targetZoom || zoom || 1;
-      // Para centrar el bbox en el viewport, calcular scroll para que centerX esté en el centro horizontal del viewport
-      // El viewport visible en coordenadas de contenido es canvas.clientWidth / currentZoom
-      // El centro del viewport en coordenadas de contenido es (scrollLeft + canvas.clientWidth/2) / currentZoom
-      // Queremos que (scrollLeft + canvas.clientWidth/2) / currentZoom = centerX
-      // Por lo tanto, scrollLeft = centerX * currentZoom - canvas.clientWidth/2
-      // Compensar padding: el canvasInner(0,0) está a padL/padT dentro del área scrolleable
-      const scrollX = Math.max(0, Math.floor(centerX * currentZoom - (canvas.clientWidth / 2) + padL));
-      const scrollY = Math.max(0, Math.floor(centerY * currentZoom - (canvas.clientHeight / 2) + padT));
-      dlog('fit', { bbox:{minLeft, minTop, maxRight, maxBottom, bboxWidth, bboxHeight}, center:{centerX, centerY}, pad:{padL,padR,padT,padB}, zoom:{zoom, targetZoom, currentZoom}, scroll:{scrollX, scrollY} });
-      canvas.scrollLeft = scrollX;
-      canvas.scrollTop = scrollY;
-      // si el bbox es mayor que el viewport, no ajustamos zoom automáticamente (evitar sorpresa);
-      // podríamos ofrecer un botón futuro "Ajustar zoom al contenido".
-      saveUiState();
-    } catch (e) { console.warn('fitCanvasToContent failed', e); }
+    if (window.AppCanvasManager && typeof window.AppCanvasManager.fitCanvasToContent === 'function') {
+      return window.AppCanvasManager.fitCanvasToContent(state, margin, adjustZoom);
+    }
   }
 
-  // Ensure a node is visible within the scrollable viewport with margin (in CSS px, pre-zoom)
+  // Ensure a node is visible within the scrollable viewport with margin
   function ensureNodeVisible(node, margin = 80) {
-    if (!canvas || !canvasInner || !node) return;
-    try {
-      const el = document.getElementById('node_' + node.id);
-      if (!el) return;
-      // Coordenadas en píxeles CSS (sin zoom) - el zoom se aplica con transform:scale
-      const left = parseFloat(el.style.left) || 0;
-      const top = parseFloat(el.style.top) || 0;
-      const width = el.offsetWidth || 180;
-      const height = el.offsetHeight || 80;
-
-      let targetLeft = canvas.scrollLeft;
-      let targetTop = canvas.scrollTop;
-      const z = zoom || 1;
-      const marginContent = margin / z;
-      const cs = getComputedStyle(canvas);
-      const padL = parseFloat(cs.paddingLeft) || 0;
-      const padR = parseFloat(cs.paddingRight) || 0;
-      const padT = parseFloat(cs.paddingTop) || 0;
-      const padB = parseFloat(cs.paddingBottom) || 0;
-      const viewportWInContent = (canvas.clientWidth - padL - padR) / z;
-      const viewportHInContent = (canvas.clientHeight - padT - padB) / z;
-      // Horizontal
-      if (left < (canvas.scrollLeft - padL) + marginContent) {
-        targetLeft = Math.max(0, Math.floor(padL + left - marginContent));
-      } else if (left + width > (canvas.scrollLeft - padL) + viewportWInContent - marginContent) {
-        targetLeft = Math.max(0, Math.floor(padL + (left + width) - viewportWInContent + marginContent));
-      }
-      // Vertical
-      if (top < (canvas.scrollTop - padT) + marginContent) {
-        targetTop = Math.max(0, Math.floor(padT + top - marginContent));
-      } else if (top + height > (canvas.scrollTop - padT) + viewportHInContent - marginContent) {
-        targetTop = Math.max(0, Math.floor(padT + (top + height) - viewportHInContent + marginContent));
-      }
-      if (targetLeft !== canvas.scrollLeft) canvas.scrollLeft = targetLeft;
-      if (targetTop !== canvas.scrollTop) canvas.scrollTop = targetTop;
-      saveUiState();
-    } catch (e) { console.warn('ensureNodeVisible failed', e); }
+    if (window.AppCanvasManager && typeof window.AppCanvasManager.ensureNodeVisible === 'function') {
+      return window.AppCanvasManager.ensureNodeVisible(node, margin);
+    }
   }
 
   // Canvas dragover & drop for creating new nodes or moving existing
@@ -507,186 +344,16 @@ const App = (() => {
 
   // import JSON (object)
   function importJson(obj) {
-    // Update current flow badge early
-    const badge = document.getElementById('currentFlowBadge');
-    if (badge) {
-      const name = obj?.meta?.name || obj?.name || obj?.flow_id || 'flujo';
-      const nameSpan = badge.querySelector('#currentFlowName');
-      if (nameSpan) nameSpan.textContent = String(name);
+    if (window.AppFlowImporter && typeof window.AppFlowImporter.importJson === 'function') {
       try {
-        const chip = badge.querySelector('#mainFlowChip');
-        if (chip) {
-          const isMain = (obj && ((obj.is_main !== undefined) ? !!obj.is_main : !!obj.meta?.is_main));
-          chip.classList.toggle('hidden', !isMain);
-        }
-      } catch (_) { /* noop */ }
-    }
-    // NOTE: intentionally do NOT delegate to AppIO.importJson here porque AppIO's
-    // simple importer does not run the richer import-time heuristics (eg. inferring
-    // loop.source_list). Keep the import logic local so the editor UI and simulator
-    // remain in sync after loading a JSON flow.
-    // Hard reset de jsPlumb para evitar estado obsoleto en reaperturas
-    try {
-      if (typeof jsPlumb !== 'undefined') {
-        if (jsPlumb.reset) jsPlumb.reset();
-        if (canvasInner && jsPlumb.setContainer) jsPlumb.setContainer(canvasInner);
-        if (jsPlumb.importDefaults) {
-          jsPlumb.importDefaults({
-            Connector: ['StateMachine', { margin: 5, curviness: 10, proximityLimit: 80 }],
-            Endpoint: ['Dot', { radius: 4 }],
-            PaintStyle: { stroke: '#5c7cfa', strokeWidth: 2 },
-            HoverPaintStyle: { stroke: '#1c7ed6', strokeWidth: 3 },
-            ConnectionOverlays: [
-              ['Arrow', { location: 1, id: 'arrow', width: 10, length: 10 }]
-            ]
-          });
-        }
-        try { if (window.AppConnections && typeof window.AppConnections.init === 'function') window.AppConnections.init(jsPlumb, canvasInner); } catch (_e) { }
-      }
-    } catch (_e) { console.warn('jsPlumb reset during import failed', _e); }
-    // fallback
-    if (!obj?.nodes) return alert('JSON inválido (no se encontró nodes)');
-    state.nodes = {};
-    state.meta.flow_id = obj.flow_id || obj.meta?.flow_id || state.meta.flow_id;
-    state.meta.version = obj.version || obj.meta?.version || state.meta.version;
-    state.meta.name = obj.name || obj.meta?.name || state.meta.name;
-    state.meta.description = obj.description || obj.meta?.description || state.meta.description;
-    state.meta.locales = obj.locales || obj.meta?.locales || state.meta.locales;
-    state.meta.start_node = obj.start_node || obj.meta?.start_node || state.meta.start_node;
-    // Importar bandera de flujo principal si existe en el JSON o meta
-    try { state.meta.is_main = (obj.is_main !== undefined) ? !!obj.is_main : !!obj.meta?.is_main; } catch(_e) {}
-    let migratedCount = 0;
-    for (const id in obj.nodes) {
-      const node = { ...obj.nodes[id] };
-      // Migración: set_var → assign_var
-      if (node.type === 'set_var') { node.type = 'assign_var'; migratedCount++; }
-      // preserve incoming canvas position if provided, otherwise compute a modest layout
-      if (node.x === undefined || node.x === null) node.x = 20 + (Object.keys(state.nodes).length * 30) % 400;
-      if (node.y === undefined || node.y === null) node.y = 20 + (Object.keys(state.nodes).length * 20) % 300;
-      // Migraciones: loop antiguo (iterExpr/itemVar) -> nuevo (source_list/item_var/index_var)
-      if (node.type === 'loop') {
-        if (!node.source_list && node.iterExpr) node.source_list = node.iterExpr;
-        if (!node.item_var && node.itemVar) node.item_var = node.itemVar;
-        if (!node.index_var) node.index_var = 'index';
-      }
-      state.nodes[id] = node;
-    }
-    if (migratedCount > 0) {
-      try { if (window.Toasts && typeof window.Toasts.info === 'function') window.Toasts.info(`Se migraron ${migratedCount} nodos set_var a assign_var`); else alert(`Se migraron ${migratedCount} nodos set_var a assign_var`); } catch (e) { console.warn('Toasts.info failed', e); }
-    }
-    // Heurística: intentar inferir source_list para foreach/loop cuando viene vacío en el JSON
-    let inferredNodes = [];
-    try {
-      const startId = obj.start_node || state.meta.start_node;
-      const startNode = startId ? state.nodes[startId] : null;
-      // construir un mapa de valores iniciales a partir de startNode.variables.defaultValue si están presentes
-      const initialVars = {};
-      if (startNode && Array.isArray(startNode.variables)) {
-        startNode.variables.forEach(v => {
-          let def = v.defaultValue;
-          if (typeof def === 'string') {
-            const s = def.trim();
-            if ((s.startsWith('{') && s.endsWith('}')) || (s.startsWith('[') && s.endsWith(']'))) {
-              try { def = JSON.parse(s); } catch (e) { /* keep as string */ }
-            }
-          }
-          initialVars[v.name] = def;
+        window.AppFlowImporter.importJson(obj, state, {
+          renderNode, refreshConnections, refreshOutput, selectNode,
+          autoGrowCanvas, fitCanvasToContent, canvasInner
         });
-      }
-
-      // helper: search recursively for array path whose elements (objects) contain a given key
-      function findArrayPath(obj, key, basePath) {
-        if (!obj) return null;
-        if (Array.isArray(obj)) {
-          if (obj.length > 0 && obj[0] && typeof obj[0] === 'object' && (key in obj[0])) return basePath;
-          return null;
-        }
-        if (typeof obj === 'object') {
-          for (const k of Object.keys(obj)) {
-            const found = findArrayPath(obj[k], key, basePath ? (basePath + '.' + k) : k);
-            if (found) return found;
-          }
-        }
-        return null;
-      }
-
-      for (const nid in state.nodes) {
-        const n = state.nodes[nid];
-        if (n && (n.type === 'foreach' || n.type === 'loop') && (!n.source_list || !String(n.source_list).trim()) && n.body_start && n.body_start.node_id) {
-          try {
-            const body = state.nodes[n.body_start.node_id];
-            if (body && body.type === 'response') {
-              const raw = body.i18n && body.i18n[(state.meta && state.meta.locales && state.meta.locales[0]) || 'en'] && Array.isArray(body.i18n[(state.meta && state.meta.locales && state.meta.locales[0]) || 'en'].text) ? body.i18n[state.meta.locales[0]].text.join('\n') : (body.text || '');
-              const m = String(raw).match(/\{\{\s*([A-Za-z0-9_\.\s]+)\s*\}\}/);
-              if (m && m[1]) {
-                const expr = m[1].trim().replace(/\s*\.\s*/g, '.');
-                const parts = expr.split('.').filter(Boolean);
-                if (parts.length >= 2) {
-                  // buscar en initialVars
-                  const prop = parts[1];
-                  for (const varName of Object.keys(initialVars)) {
-                    const path = findArrayPath(initialVars[varName], prop, varName);
-                    if (path) {
-                      n.source_list = path;
-                      try { console.debug('[importJson] inferred source_list for', nid, '->', n.source_list); } catch (e) { }
-                      inferredNodes.push(nid);
-                      break;
-                    }
-                  }
-                }
-              }
-            }
-          } catch (e) { console.warn('foreach infer loop failed', e); }
-        }
-      }
-    } catch (e) { console.warn('infer source_list failed', e); }
-    // Limpiar conexiones previas de jsPlumb antes de re-renderizar el lienzo
-    try { if (typeof jsPlumb !== 'undefined' && jsPlumb.deleteEveryConnection) jsPlumb.deleteEveryConnection(); } catch (_e) { console.warn('deleteEveryConnection before import failed', _e); }
-    canvasInner.innerHTML = '';
-    for (const id in state.nodes) renderNode(state.nodes[id]);
-    refreshConnections();
-    refreshOutput();
-    try { autoGrowCanvas(); } catch (e) { console.warn('autoGrowCanvas after import failed', e); }
-    // Centrar viewport al contenido tras renderizar
-    try {
-      fitCanvasToContent();
-      // Segundo intento tras leve delay por si tamaños cambian al terminar de pintar
-      setTimeout(() => { try { fitCanvasToContent(); } catch (_e2) { } }, 60);
-    } catch (_e1) { console.warn('fitCanvasToContent after import failed', _e1); }
-    // Refrescar conexiones nuevamente después de que el layout haya podido estabilizarse
-    try {
-      const st = window.App && window.App.state;
-      if (st && window.AppConnections && typeof window.AppConnections.refreshConnections === 'function') {
-        // Inmediato (cola)
-        setTimeout(() => { try { window.AppConnections.refreshConnections(st); } catch (_e) { } }, 0);
-        // Un poco después para cubrir imágenes/transiciones
-        setTimeout(() => { try { window.AppConnections.refreshConnections(st); } catch (_e) { } }, 120);
-        setTimeout(() => { try { window.AppConnections.refreshConnections(st); } catch (_e) { } }, 300);
-        setTimeout(() => { try { window.AppConnections.refreshConnections(st); } catch (_e) { } }, 500);
-      }
-    } catch (_r) { /* noop */ }
-    // Ensure current flow badge reflects state meta name if changed by import
-    try {
-      const badge = document.getElementById('currentFlowBadge');
-      if (badge) {
-        const name = state.meta?.name || state.meta?.flow_id || 'flujo';
-        const nameSpan = badge.querySelector('#currentFlowName');
-        if (nameSpan) nameSpan.textContent = String(name);
-        try {
-          const chip = badge.querySelector('#mainFlowChip');
-          if (chip) chip.classList.toggle('hidden', !(state.meta && state.meta.is_main === true));
-        } catch (_) { /* noop */ }
-      }
-    } catch (_e) { }
-    // If we inferred one or more nodes, select the first inferred node so the user sees the autocompleted value.
-    try {
-      if (inferredNodes && inferredNodes.length) {
-        selectNode(inferredNodes[0]);
-      } else if (state.selectedId && state.nodes[state.selectedId]) {
-        // otherwise re-select previous to refresh properties panel
-        selectNode(state.selectedId);
-      }
-    } catch (e) { console.warn('post-import selection failed', e); }
+        return;
+      } catch (e) { console.warn('AppFlowImporter.importJson failed', e); }
+    }
+    alert('No se pudo importar el flujo (AppFlowImporter no disponible)');
   }
 
   // load example via fetch
@@ -759,33 +426,60 @@ const App = (() => {
     restoreUiState();
     // ensure canvas fits current nodes on init
     try { autoGrowCanvas(); } catch (e) { console.warn('autoGrowCanvas on init failed', e); }
-    // record base size from CSS after initial layout
-    try {
-      baseCanvasWidth = canvasInner.scrollWidth;
-      baseCanvasHeight = canvasInner.scrollHeight;
-    } catch (e) { console.warn('record base canvas size failed', e); }
-    // Observa cambios de tamaño del canvas interno y reintenta refrescar conexiones
-    try {
-      if (canvasInner && typeof ResizeObserver !== 'undefined') {
-        let roTimer = null;
-        const ro = new ResizeObserver(() => {
-          try { if (roTimer) clearTimeout(roTimer); } catch (_e) { }
-          roTimer = setTimeout(() => {
-            try { if (window.AppConnections?.refreshConnections) window.AppConnections.refreshConnections(state); } catch (_e2) { }
-          }, 60);
-        });
-        ro.observe(canvasInner);
-      } else {
-        // Como fallback, al cerrar el modal/otros triggers se suele disparar resize de ventana
-        window.addEventListener('resize', () => {
-          try { if (window.AppConnections?.refreshConnections) window.AppConnections.refreshConnections(state); } catch (_e) { }
-        });
-      }
-    } catch (err) { console.warn('ResizeObserver setup failed', err); }
+    // initialize AppCanvasManager
+    if (window.AppCanvasManager && typeof window.AppCanvasManager.init === 'function') {
+      window.AppCanvasManager.init({ canvas, canvasInner, getZoom: () => zoom, setZoom, saveUiState });
+    }
+    // ResizeObserver moved to AppCanvasManager
+    // Initialize AppFlowManager
+    if (window.AppFlowManager && typeof window.AppFlowManager.init === 'function') {
+      window.AppFlowManager.init(state, { createNode, renderNode, selectNode, refreshOutput });
+    }
+
     // Inicializar NodeFactory si está disponible (debe hacerse antes de crear nodos)
     if (window.AppNodeFactory && typeof window.AppNodeFactory.init === 'function') {
       try { window.AppNodeFactory.init({ state, renderNode, selectNode, refreshOutput }); } catch (e) { console.warn('AppNodeFactory.init failed', e); }
     }
+
+    // Inicializar HistoryManager
+    if (window.AppHistoryManager && typeof window.AppHistoryManager.init === 'function') {
+      try {
+        window.AppHistoryManager.init(state, { refreshOutput, renderNode, selectNode });
+        console.log('[main] HistoryManager initialized');
+      } catch (e) { console.warn('AppHistoryManager.init failed', e); }
+    }
+
+    // Inicializar NodeSearch
+    if (window.AppNodeSearch && typeof window.AppNodeSearch.init === 'function') {
+      try {
+        window.AppNodeSearch.init(state, { selectNode, ensureNodeVisible });
+        console.log('[main] NodeSearch initialized');
+      } catch (e) { console.warn('AppNodeSearch.init failed', e); }
+    }
+
+    // Initialize Selection Manager
+    if (window.AppSelectionManager && typeof window.AppSelectionManager.init === 'function') {
+      try {
+        window.AppSelectionManager.init(state, {
+          renderNode,
+          onSelectionChanged: (ids) => {
+            // Optional: Update UI or log
+            console.log('Selection changed:', ids);
+            // Force refresh of keyboard controls context if needed
+          }
+        });
+        console.log('[main] SelectionManager initialized');
+      } catch (e) { console.warn('AppSelectionManager.init failed', e); }
+    }
+
+    // Initialize Canvas Selection (Lasso)
+    if (window.AppCanvasSelection && typeof window.AppCanvasSelection.init === 'function') {
+      try {
+        window.AppCanvasSelection.init({ canvas, state });
+        console.log('[main] CanvasSelection initialized');
+      } catch (e) { console.warn('AppCanvasSelection.init failed', e); }
+    }
+
     // No crear Start automáticamente: el usuario lo agregará desde la paleta cuando lo necesite.
     // Inicializar jsPlumb
     if (typeof jsPlumb !== 'undefined') {
@@ -843,43 +537,24 @@ const App = (() => {
         refreshOutput,
         selectNode,
         deleteNode: (id) => {
-          // Lógica de borrado (delegar o implementar simple)
-          if (window.AppNodeEditor && window.AppNodeEditor.deleteNode) {
-            window.AppNodeEditor.deleteNode(state, id, { refreshOutput, selectNode });
+          if (window.AppFlowManager && window.AppFlowManager.deleteNode) {
+            window.AppFlowManager.deleteNode(id);
           } else {
-            // Fallback simple
-            delete state.nodes[id];
-            const el = document.getElementById('node_' + id); if (el) el.remove();
-            if (typeof jsPlumb !== 'undefined') jsPlumb.remove('node_' + id);
-            selectNode(null);
-            refreshOutput();
+            console.warn('AppFlowManager.deleteNode not available');
           }
         },
         duplicateNode: (id) => {
-          if (window.AppNodeEditor && window.AppNodeEditor.duplicateNode) {
-            window.AppNodeEditor.duplicateNode(state, id, { createNode, refreshOutput, selectNode });
+          if (window.AppFlowManager && window.AppFlowManager.duplicateNode) {
+            window.AppFlowManager.duplicateNode(id);
           } else {
-            // Fallback simple: clonar data y crear nuevo
-            const src = state.nodes[id];
-            if (!src) return;
-            const newNode = createNode(src.type, src.x + 20, src.y + 20);
-            // Copiar props (excepto id, x, y)
-            Object.keys(src).forEach(k => {
-              if (k !== 'id' && k !== 'x' && k !== 'y') newNode[k] = JSON.parse(JSON.stringify(src[k]));
-            });
-            // Regenerar ID si se copió mal (createNode ya da ID, pero al copiar props...)
-            // createNode devuelve objeto base, al copiar encima pisamos. Mejor copiar props A newNode.
-            // Re-render
-            renderNode(newNode);
-            selectNode(newNode.id);
-            refreshOutput();
+            console.warn('AppFlowManager.duplicateNode not available');
           }
         }
       });
     } catch (e) { console.warn('AppKeyboardControls init failed', e); }
   }
 
-  return { init, createNode, state, importJson, generateFlowJson, refreshOutput, autoGrowCanvas, ensureNodeVisible, fitCanvasToContent, getSnapEnabled, getGridSize, applyNodeChanges };
+  return { init, createNode, state, importJson, generateFlowJson, refreshOutput, autoGrowCanvas, ensureNodeVisible, fitCanvasToContent, getSnapEnabled, getGridSize, applyNodeChanges, showProperties };
 })();
 
 // Expose App to window for debugging and external control (importing flows, refresh, etc.)
@@ -894,5 +569,43 @@ document.addEventListener('DOMContentLoaded', () => {
   } else {
     console.warn('[main] jsPlumb not found, initializing App without it...');
     App.init();
+    // --- AI Copilot Initialization ---
+    console.log('[Main] Checking for Copilot modules...', {
+      CopilotCore: !!window.CopilotCore,
+      CopilotUI: !!window.CopilotUI,
+      AzureCopilotProvider: !!window.AzureCopilotProvider,
+      LocalCopilotProvider: !!window.LocalCopilotProvider
+    });
+
+    if (window.CopilotCore && window.CopilotUI) {
+      console.log('[Main] Copilot modules found, initializing...');
+      // Configuration for Azure (To be filled by user or env)
+      const azureConfig = {
+        endpoint: localStorage.getItem('bri_azure_endpoint') || '',
+        apiKey: localStorage.getItem('bri_azure_key') || ''
+      };
+
+      let provider;
+      if (azureConfig.endpoint && azureConfig.apiKey && window.AzureCopilotProvider) {
+        console.log('[Copilot] Using Azure Provider');
+        provider = new window.AzureCopilotProvider(azureConfig);
+      } else if (window.LocalCopilotProvider) {
+        console.log('[Copilot] Using Local Provider (Mock)');
+        provider = new window.LocalCopilotProvider();
+      }
+
+      if (provider) {
+        console.log('[Main] Creating CopilotService...');
+        const service = new window.CopilotCore.CopilotService(provider, App.flowManager);
+        console.log('[Main] Calling CopilotUI.init...');
+        window.CopilotUI.init(service);
+        console.log('[Main] AI Copilot initialized');
+      } else {
+        console.warn('[Main] No copilot provider available');
+      }
+    } else {
+      console.warn('[Main] Copilot modules not found');
+    }
+
   }
 });
