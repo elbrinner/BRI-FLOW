@@ -17,6 +17,11 @@ Recomendado (servidor estático):
 1. `python3 -m http.server 8081`
 2. Abrir `http://localhost:8081`
 
+Alternativa (Node.js):
+
+1. `npx http-server -p 8081`
+2. Abrir `http://localhost:8081`
+
 Alternativa rápida: abrir `index.html` (limitado por políticas del navegador si vas a hacer llamadas HTTP).
 
 ## Documentación
