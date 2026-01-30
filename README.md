@@ -1,270 +1,57 @@
-# BRI-FLOW — Editor visual de flujos (generador de JSON)
-
-BRI-FLOW es un editor visual para diseñar flujos conversacionales/procesos a partir de nodos conectables. El resultado es un JSON estructurado que describe el flujo. Este repositorio contiene exclusivamente el editor (frontend) y utilidades de simulación. 
+# BRI-FLOW
 
-**Importante**: Para ejecutar un flujo real hace falta un backend/intérprete que procese el JSON y hable con canales/servicios externos. Ese backend no forma parte de este repositorio y no es open source.
-
-## ⚠️ Estado del Proyecto
-
-### Editor de Agentes: Inestable 🚧
-
-La funcionalidad de **agentes** (nodo `agent_call`) está en **desarrollo activo** y puede presentar cambios incompatibles entre versiones:
-
-- **Simulador**: 
-  - ✅ **Estable** para perfiles `normal`, `domain_expert` y `rag` en modo directo (Azure OpenAI + Azure AI Search)
-  - ⚠️ **Inestable** para perfiles `coordinator` y `retrieval` (requieren backend con implementación mínima)
-  
-- **Backend**: 
-  - ✅ **Producción** para perfiles `normal`
-  - 🚧 **Beta** para perfil `coordinator` (modos: `sequential`, `group_chat`, `fanout`) , `rag`, `retrieval`, `domain_expert`
-  
-- **Interfaz del Editor**: 
-  - ⚠️ **Inestable** - El panel de configuración de `agent_call` puede cambiar al agregar nuevas capacidades
-  - Los campos actuales (`agent_profile`, `message`, `system_prompt`, `search`, `participants`, `mode`, `stream`) se mantendrán, pero pueden aparecer nuevas opciones
-
-**Recomendación**: Para producción, usa perfiles estables (`normal`, `rag`, `domain_expert`). Los perfiles experimentales (`coordinator`) son para pruebas y desarrollo.
-
-### Otros Nodos: Estables ✅
-
-Todos los demás tipos de nodos (`start`, `response`, `input`, `button`, `form`, `rest_call`, `condition`, `loop`, etc.) están **estables** y en producción.
-
-## Probar online
-- Puedes probar una versión hospedada aquí: https://elbrinner.com/flow/
-
-## ¿Qué incluye este repo?
-- Un canvas para componer nodos (drag & drop), prop panel por tipo de nodo y vista JSON.
-- Renderers de nodos en `js/renderers/` para editar sus propiedades.
-- Un simulador básico para probar la experiencia (no sustituye al backend definitivo).
- - Guías y patrones para definir flujos reutilizables (post‑vista y post‑solución) y el patrón extract/modify/inject.
-
-## Tipos de Nodos Disponibles 📦
-
-BRI-FLOW incluye **25+ tipos de nodos** organizados en categorías:
-
-### Control de Flujo
-- **`start`** - Define variables globales iniciales. En el flujo principal centraliza los idiomas soportados (`locales`).
-- **`end`** - Termina el flujo
-- **`condition`** - Evalúa expresión y salta según true/false
-- **`set_goto`** - Guarda punto de retorno para navegación controlada
-- **`flow_jump`** - Salta a otro flujo/nodo con opción de retorno
-
-### Interacción con Usuario
-- **`response`** - Muestra texto(s) al usuario (con soporte i18n)
-- **`input`** - Solicita entrada de texto y guarda en variable
-- **`button`** - Presenta opciones con botones (estático/dinámico)
-- **`multi_button`** - Selección múltiple con opciones
-- **`choice`** - Decisión interactiva (prompt) o programática (switch)
-- **`form`** - Formulario con múltiples campos
-- **`hidden_response`** - Asigna valor sin mostrar al usuario
-
-### Datos y Variables
-- **`assign_var`** - Asigna valores a variables (soporta expresiones)
-- **`debug`** - Depuración con log de variables y payload
-
-### Archivos
-- **`file_upload`** - Permite subir archivo al usuario
-- **`file_download`** - Ofrece descarga de archivo
-- **`json_export`** - Exporta datos como JSON
-
-### Multimedia y UI Avanzada
-- **`hero_card`** - Tarjeta con título, imagen y botones
-- **`carousel`** - Carrusel de tarjetas
-
-### Iteración
-- **`loop`** - Bucle genérico (foreach/while)
-- **`foreach`** - Itera sobre una lista
-- **`while`** - Ejecuta mientras condición sea verdadera
-
-### Integraciones
-- **`rest_call`** - Llamada HTTP REST con mapeo de respuesta
-- **`agent_call`** - Invoca agente de IA (Azure OpenAI, RAG, etc.) ⚠️ **Inestable**
-- **`extra`** - Punto de integración efímera (envío de payload desde frontend)
-
-### Utilidades del Simulador (No exportables)
-- **`credential_profile`** - Define credenciales para simulación (no se exporta)
-- **`use_profile`** - Activa perfil de credenciales en simulador
-
-> 📖 **Documentación completa**: Nodos en [docs/nodo.md](docs/nodo.md) · Expresiones/funciones en [docs/expresiones.md](docs/expresiones.md).
-
-## Estado del proyecto y alcance
-- Este editor está orientado a diseño de flujos y prototipado.
-- El backend de ejecución (interpretación del JSON y orquestación) es propietario y no está publicado aquí.
-
-## Motivación
-- Hay muy pocas opciones para construir flujos conversacionales que integren LLM/IA de forma estructurada; este editor busca combinar lo mejor de los flujos deterministas por nodos con las capacidades generativas de los LLM.
-- Unificar el diseño de flujos en un formato JSON portable entre canales y proyectos.
-- Permitir que perfiles no técnicos puedan diseñar y validar experiencias sin depender del backend.
-- Acelerar el prototipado y la comunicación entre producto y desarrollo.
-- Separar responsabilidades: un editor abierto para modelar y un runtime propietario para ejecutar.
-- Diseñar prompts, herramientas y variables/slots de forma explícita para guiar al LLM sin perder trazabilidad ni control.
-
-## Tabla de Compatibilidad de Nodos 📊
-
-| Tipo de Nodo | Estado | Simulador | Backend | Notas |
-|--------------|--------|-----------|---------|-------|
-| `start` | ✅ Estable | ✅ | ✅ | Único por flujo |
-| `end` | ✅ Estable | ✅ | ✅ | - |
-| `response` | ✅ Estable | ✅ | ✅ | Soporte i18n |
-| `input` | ✅ Estable | ✅ | ✅ | - |
-| `assign_var` | ✅ Estable | ✅ | ✅ | Soporta expresiones |
-| `choice` | ✅ Estable | ✅ | ✅ | Modos: prompt/switch |
-| `button` | ✅ Estable | ✅ | ✅ | Estático/dinámico |
-| `multi_button` | ✅ Estable | ✅ | ✅ | Selección múltiple |
-| `form` | ✅ Estable | ✅ | ✅ | - |
-| `rest_call` | ✅ Estable | ✅ | ✅ | Requiere servidor HTTP en local |
-| `condition` | ✅ Estable | ✅ | ✅ | - |
-| `loop`/`foreach`/`while` | ✅ Estable | ✅ | ✅ | - |
-| `set_goto` | ✅ Estable | ✅ | ✅ | - |
-| `flow_jump` | ✅ Estable | ✅ | ✅ | - |
-| `file_upload` | ✅ Estable | ⚠️ Limitado | ✅ | Simulador: solo validación |
-| `file_download` | ✅ Estable | ✅ | ✅ | - |
-| `json_export` | ✅ Estable | ✅ | ✅ | - |
-| `hero_card` | ✅ Estable | ✅ | ✅ | Depende del canal |
-| `carousel` | ✅ Estable | ✅ | ✅ | Depende del canal |
-| `hidden_response` | ✅ Estable | ✅ | ✅ | - |
-| `debug` | ✅ Estable | ✅ | ✅ | - |
-| `extra` | ✅ Estable | ⚠️ Limitado | ✅ | Simulador: solo mockeo |
-| **`agent_call`** | **🚧 Inestable** | **⚠️ Parcial** | **🚧 Beta** | Ver sección de agentes |
-| `credential_profile` | ✅ Estable | ✅ | ❌ | Solo simulador, no exportable |
-| `use_profile` | ✅ Estable | ✅ | ❌ | Solo simulador |
-
-### Leyenda
-- ✅ **Estable**: Producción, API estable
-- 🚧 **Inestable**: En desarrollo, puede cambiar
-- ⚠️ **Parcial/Limitado**: Funcionalidad reducida vs backend
-- ❌ **No soportado**: No disponible en ese entorno
-
-## Documentación de nodos
-
-📖 **Documentación completa y detallada**: [docs/nodo.md](docs/nodo.md)
-
-📖 **Referencia canónica de expresiones/funciones**: [docs/expresiones.md](docs/expresiones.md)
-
-Cada tipo de nodo, sus campos y comportamiento están descritos en:
-
-- [docs/nodo.md](docs/nodo.md)
-
-Incluye:
-- Descripción de cada tipo de nodo
-- Propiedades y configuración
-- Ejemplos de uso
-- Expresiones y funciones disponibles
-- Convenciones de i18n y variables
+Editor visual (frontend) para diseñar flujos conversacionales/procesos mediante nodos conectables. El resultado es un JSON estructurado que describe el flujo.
 
-**Resumen rápido de nodos principales**:
+Este repositorio contiene el **editor** y utilidades de **simulación**. El backend/runtime que ejecuta el JSON en producción no está incluido aquí.
 
-### Patrones recomendados (EIRA)
+## Demo
 
-- Patrón Extract/Work/Inject: documentado en `egoverabot-assistant/Docs/plan_plano.md`.
-- Flujos reutilizables de salto (jump):
-  - `eira_post_view_actions`: acciones tras completar una vista (flags, descargar y continuar o confirmar).
-  - `eira_post_solution_actions`: acciones al finalizar todas las vistas (descargar solución, reiniciar con otro DBC o finalizar).
+- Online: https://elbrinner.com/flow/
 
-Estos patrones evitan duplicación y mejoran la legibilidad del JSON, separando “trabajo de la vista” de “acciones comunes”.
+## Documentación
 
-<details>
-<summary><strong>Control de Flujo</strong> (5 nodos)</summary>
+- Índice: [docs/README.md](docs/README.md)
+- Nodos: [docs/nodos.md](docs/nodos.md) (compat: [docs/nodo.md](docs/nodo.md))
+- Expresiones: [docs/expresiones.md](docs/expresiones.md)
+- Desarrollo local: [docs/desarrollo.md](docs/desarrollo.md)
+- Pruebas: [docs/pruebas.md](docs/pruebas.md)
 
-- **`start`**: Define variables globales iniciales. En el flujo principal define y centraliza los idiomas (`locales`). Solo uno por flujo.
-- **`end`**: Termina el flujo. No debe tener `next`.
-- **`condition`**: Evalúa expresión y salta a `true_target` o `false_target`.
-- **`set_goto`**: Guarda en `context.goto` un identificador de retorno.
-- **`flow_jump`**: Salta a otro flujo/nodo con opción de retorno automático.
+## Ejecutar en local
 
-</details>
+Opción recomendada (servidor estático):
 
-<details>
-<summary><strong>Interacción con Usuario</strong> (8 nodos)</summary>
+1. `python3 -m http.server 8081`
+2. Abrir `http://localhost:8081`
 
-- **`response`**: Muestra texto(s) al usuario (pueden rotar al azar). Soporta i18n.
-- **`input`**: Pide un valor al usuario y lo guarda en variable.
-- **`button`**: Presenta opciones con botones (modo estático o dinámico desde lista).
-- **`multi_button`**: Selección múltiple con opciones (min/max selección).
-- **`choice`**: 
-  - Modo `prompt`: opciones interactivas
-  - Modo `switch`: evalúa casos `when` y salta según condición
-- **`form`**: Formulario con múltiples campos configurables.
-- **`hidden_response`**: Asigna valor a variable sin mostrar al usuario.
-- **`extra`**: Punto de integración efímera para envío de payload desde frontend.
+Opción rápida:
 
-</details>
+- Abrir `index.html` en el navegador.
 
-<details>
-<summary><strong>Datos y Variables</strong> (2 nodos)</summary>
+## Desarrollo
 
-- **`assign_var`**: Asigna uno o varios valores a variables. Soporta expresiones y rutas (ej: `persona.nombre`).
-- **`debug`**: Depuración con log de variables y payload. Útil para troubleshooting.
+1. Instalar dependencias (solo necesarias para tests): `npm install`
+2. Ejecutar pruebas:
+   - E2E (Playwright): `npm run test:e2e`
+  - Runners HTML del simulador: `tests/test-runner.html` y `tests/test-runner-nodes.html`
 
-</details>
+Nota: el script `npm run test:form` existe como prueba legacy de Node+JSDOM, pero actualmente referencia un archivo no presente (`js/nodes/processForm.js`).
 
-<details>
-<summary><strong>Archivos</strong> (3 nodos)</summary>
+Notas para E2E:
 
-- **`file_upload`**: Permite al usuario subir archivo (configurar extensiones y tamaño máximo).
-- **`file_download`**: Ofrece descarga de archivo al usuario.
-- **`json_export`**: Exporta datos como archivo JSON con plantilla configurable.
+- Primera vez: `npx playwright install`
+- La config levanta un server local en `http://localhost:8081` (ver `playwright.config.js`).
 
-</details>
+## Estructura
 
-<details>
-<summary><strong>UI Avanzada</strong> (2 nodos)</summary>
+- `index.html`: UI principal del editor
+- `components/`: paneles/modales HTML
+- `css/`: estilos
+- `js/`: lógica del editor, renderers, serializer y simulador
+- `tests/`: unit/smoke y E2E
 
-- **`hero_card`**: Tarjeta con título, subtítulo, imagen y botones.
-- **`carousel`**: Carrusel de múltiples tarjetas (depende del canal).
+## Licencia
 
-</details>
-
-<details>
-<summary><strong>Iteración</strong> (3 nodos)</summary>
-
-- **`loop`**: Bucle genérico (UI general).
-- **`foreach`**: Itera sobre una lista con `item_var` e `index_var`.
-- **`while`**: Ejecuta mientras condición sea verdadera (con `max_iterations` opcional).
-
-Opcionales avanzados: `break_if_expr`, `filter_expr`, `sort_expr`, `count_save_as`, `last_item_save_as`.
-
-</details>
-
-<details>
-<summary><strong>Integraciones</strong> (2 nodos) ⚠️</summary>
-
-- **`rest_call`**: 
-  - Ejecuta petición HTTP (GET, POST, PUT, DELETE, PATCH)
-  - Mapea respuesta a variables con `mappings`
-  - Soporta mock mode: `off`, `fallback`, `always`
-  - Simulador: requiere servidor HTTP con CORS habilitado
-
-- **`agent_call`** 🚧 **Inestable**: 
-  - Invoca agente de IA con Azure OpenAI
-  - Perfiles disponibles: `normal`, `domain_expert`, `rag`, `coordinator`, `retrieval`
-  - Soporta streaming (SSE) y modo sincrónico
-  - Configuración de búsqueda (RAG) con Azure AI Search
-  - Orquestación multi-agente (coordinator)
-  - **Ver sección completa de agentes abajo** ↓
-
-</details>
-
-<details>
-<summary><strong>Utilidades del Simulador</strong> (2 nodos - No exportables)</summary>
-
-- **`credential_profile`**: Define credenciales para simulación (Azure OpenAI, AI Search). No se exporta en JSON final.
-- **`use_profile`**: Activa perfil de credenciales por nombre para usar en `agent_call`.
-
-Estos nodos facilitan pruebas sin exponer secretos en el flujo. El serializer los elimina automáticamente al exportar.
-
-</details>
-
----
-
-### Expresiones y Funciones
-
-El editor soporta expresiones en múltiples campos (ej: `assign_var.value`, `condition.expr`, `choice.cases[].when`):
-
-**Funciones de string**: `len()`, `split()`, `join()`, `trim()`, `upper()`, `lower()`, `contains()`
-
-**Funciones de lista**: `addItem()`, `removeItem()`, `removeAt()`, `indexOf()`, `reverse()`, `slice()`
-
-**Funciones de conversión**: `toNumber()`, `toString()`, `toBoolean()`
+MIT. Ver [LICENSE.md](LICENSE.md).
 
 **Funciones lógicas**: `coalesce()`, `iif()`, `isEmpty()`, `isNotEmpty()`
 

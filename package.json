@@ -2,6 +2,7 @@
   "name": "bri-flow-tests",
   "version": "0.1.0",
   "private": true,
+  "license": "MIT",
   "type": "module",
   "scripts": {
     "test:form": "node tests/form_processForm_node_test.mjs",

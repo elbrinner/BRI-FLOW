@@ -1,2 +1,3 @@
-EIRA-FLOW-.code-workspace
 node_modules
+dist
+.env    
