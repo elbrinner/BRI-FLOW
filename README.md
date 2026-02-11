@@ -1,5 +1,7 @@
 # BRI-FLOW
 
+![BRI-FLOW](img/briflow.png)
+
 Editor visual (frontend) para diseñar flujos conversacionales/procesos mediante nodos conectables. El resultado es un JSON estructurado que describe el flujo.
 
 Este repositorio contiene el **editor** y utilidades de **simulación** en navegador.
